@@ -1,5 +1,5 @@
 /* MY DAY offline cache. Increment the version when app files change. */
-const CACHE_NAME = 'my-day-pink-grape-v4';
+const CACHE_NAME = 'my-day-pink-grape-v5';
 const APP_FILES = [
   './',
   './index.html',
