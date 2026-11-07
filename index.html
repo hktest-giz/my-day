@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#FFD1DC">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="MY DAY">
+  <meta name="description" content="할 일을 정리하고 오늘의 계획과 수면 시간을 관리하는 MY DAY">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="./icons/favicon-48.png">
+  <style>
+:root {
+  color-scheme: light;
+  --pink: #FFD1DC;
+  --pink-soft: #FFF0F3;
+  --page: #FFF9FB;
+  --card: #FFFFFF;
+  --line: #F0D5DE;
+  --ink: #62434F;
+  --sub: #816774;
+  --green: #819987;
+  --green-dot: #A6BBAA;
+  --urgent: #B8758B;
+  --urgent-dot: #D9A1B2;
+  --urgent-count: #A85C76;
+  --shadow: 0 8px 24px rgba(132, 83, 101, .055);
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font-size: 14px; font-weight: 600; line-height: 1.5; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+.app-shell { width: min(100% - 32px, 620px); margin: 0 auto; padding: 22px 0 36px; }
+.hero { padding: 22px; border-radius: 22px; background: var(--pink); box-shadow: var(--shadow); }
+.hero-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+.brand { display: inline-flex; align-items: center; gap: 5px; }
+.brand img { display: block; width: 25px; height: 25px; border-radius: 7px; }
+.hero h1 { font-size: 25px; line-height: 1.25; margin: 20px 0 5px; font-weight: 850; letter-spacing: -.04em; }
+.hero-subtitle { margin: 0; font-size: 12px; font-weight: 650; }
+.metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 21px; }
+.metric { min-width: 0; padding: 11px 10px; background: rgba(255,255,255,.84); border-radius: 13px; }
+.metric-label { min-height: 31px; color: var(--sub); font-size: 11px; font-weight: 750; line-height: 1.35; }
+.metric-value { overflow: hidden; white-space: nowrap; font-size: clamp(12px, 3.35vw, 18px); font-weight: 850; letter-spacing: -.045em; }
+.metric-sub { margin-top: 3px; color: var(--urgent-count); font-size: 10px; font-weight: 800; }
+.tabs { display: flex; gap: 4px; margin: 13px 0; padding: 4px; border-radius: 13px; background: var(--pink-soft); }
+.tab { flex: 1; min-width: 0; border: 0; border-radius: 10px; padding: 11px 4px; background: transparent; color: var(--ink); font-size: 12px; font-weight: 800; }
+.tab.active { background: var(--pink); }
+.view { display: grid; gap: 13px; }
+.view[hidden] { display: none !important; }
+.section-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+h2 { margin: 0; font-size: 19px; font-weight: 850; letter-spacing: -.035em; }
+h3 { margin: 0; font-size: 14px; font-weight: 800; }
+.muted { color: var(--sub); font-weight: 600; }
+.small { font-size: 11px; }
+.today-chip { padding: 5px 10px; border-radius: 99px; background: var(--pink); font-size: 11px; font-weight: 800; }
+.card { min-width: 0; padding: 15px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); box-shadow: var(--shadow); }
+.progress-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.progress-value { display: flex; align-items: center; gap: 7px; font-weight: 800; }
+.strawberry { font-size: 20px; line-height: 1; }
+.progress-track { height: 9px; margin-top: 12px; overflow: hidden; border-radius: 99px; background: #F8EDF1; }
+.progress-fill { height: 100%; width: 0; border-radius: inherit; background: var(--pink); transition: width .2s ease; }
+.btn { border: 1px solid var(--line); border-radius: 10px; padding: 10px 13px; background: white; color: var(--ink); font-size: 12px; font-weight: 800; }
+.btn.primary { border-color: var(--pink); background: var(--pink); }
+.btn.full { width: 100%; }
+.btn:focus-visible, .tab:focus-visible, input:focus-visible { outline: 2px solid #C77D95; outline-offset: 2px; }
+.new-plan { margin-top: 12px; }
+.task-list { display: grid; gap: 9px; margin-top: 12px; }
+.task-card { display: flex; flex-direction: column; gap: 9px; min-width: 0; padding: 11px; border: 1px solid var(--line); border-radius: 12px; background: white; }
+.task-card[draggable="true"] { cursor: grab; touch-action: auto; user-select: none; -webkit-user-select: none; }
+.task-card.dragging { opacity: .48; border: 1px dashed #D994AA; background: #FFF5F7; }
+.task-card.drag-over { border-color: #D994AA; }
+.task-indicators { display: flex; align-items: center; flex-wrap: wrap; gap: 11px; min-height: 4px; font-size: 11px; font-weight: 700; }
+.indicator { display: inline-flex; align-items: center; gap: 6px; }
+.indicator .dot { display: inline-block; width: 6px; height: 6px; flex: none; border-radius: 50%; }
+.indicator.daily { color: var(--green); }
+.indicator.daily .dot { background: var(--green-dot); }
+.indicator.urgent { color: var(--urgent); }
+.indicator.urgent .dot { background: var(--urgent-dot); }
+.task-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.task-check { width: 17px; height: 17px; flex: none; margin: 0; accent-color: #DF879E; }
+.task-info { flex: 1; min-width: 0; }
+.task-name { overflow-wrap: anywhere; font-size: 14px; font-weight: 500; }
+.task-card.is-done .task-name { text-decoration: line-through; opacity: .65; }
+.task-meta { margin-top: 3px; color: var(--sub); font-size: 11px; font-weight: 600; overflow-wrap: anywhere; }
+.task-actions { display: flex; align-items: center; gap: 4px; flex: none; }
+.empty { padding: 19px 8px; text-align: center; color: var(--sub); font-size: 12px; font-weight: 600; }
+.form-grid { display: grid; gap: 13px; }
+.field-label { display: block; margin-bottom: 5px; color: var(--ink); font-size: 12px; font-weight: 800; }
+.text-input, .date-input, .time-input { width: 100%; min-width: 0; height: 40px; border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; background: #FFF9FB; color: var(--ink); font-size: 12px; font-weight: 650; }
+.text-input::placeholder { color: #B5A2AA; }
+.two-col { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 9px; align-items: end; }
+.duration-control { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.step-btn { width: 29px; height: 40px; flex: none; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); font-size: 18px; font-weight: 650; line-height: 1; }
+.duration-control .text-input { flex: 1; width: 1px; padding: 7px 3px; text-align: center; font-size: 11px; }
+.mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mode-switch .selected { border-color: var(--pink); background: var(--pink); }
+.mode-help { min-height: 17px; font-size: 11px; }
+.sleep-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 9px; align-items: end; }
+.sleep-control { display: flex; align-items: center; gap: 3px; min-width: 0; }
+.sleep-control .step-btn { width: 25px; height: 40px; }
+.sleep-middle { display: flex; align-items: center; flex: 1; min-width: 0; gap: 1px; height: 40px; border: 1px solid var(--line); border-radius: 9px; padding: 2px; background: #FFF9FB; }
+.sleep-middle .recommend { flex: none; padding: 0 1px; color: var(--green); font-size: 9px; font-weight: 850; white-space: nowrap; }
+.sleep-middle .text-input { height: 34px; flex: 1; width: 1px; border: 0; padding: 4px 1px; background: transparent; text-align: center; font-size: 10px; }
+.sleep-preview { padding: 23px 12px; text-align: center; }
+.sleep-preview-time { display: block; margin-top: 5px; font-size: 34px; font-weight: 850; letter-spacing: -.04em; }
+.footer-note { padding: 4px 0; text-align: center; color: var(--sub); font-size: 11px; font-weight: 600; }
+.hidden { display: none !important; }
+@media (max-width: 390px) {
+  .app-shell { width: min(100% - 22px, 620px); padding-top: 12px; }
+  .hero { padding: 17px; }
+  .hero h1 { font-size: 22px; }
+  .metrics { gap: 6px; }
+  .metric { padding: 9px 7px; }
+  .metric-value { font-size: 11px; letter-spacing: -.06em; }
+  .metric-sub { font-size: 9px; }
+  .sleep-middle .recommend { font-size: 8px; }
+  .sleep-middle .text-input { font-size: 9px; }
+  .step-btn { width: 26px; }
+}
+
+  </style>
+  <title>MY DAY · Pink Grape</title>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="hero">
+      <div class="hero-top">
+        <span>MY PERSONAL PLANNER</span>
+        <span class="brand"><span aria-hidden="true" style="font-size:24px">🍇</span> MY DAY</span>
+      </div>
+      <h1>나의 하루를 계획해요</h1>
+      <p class="hero-subtitle">Plan your day, live your day.</p>
+      <div class="metrics" aria-live="polite">
+        <div class="metric">
+          <div class="metric-label">오늘 할 일</div>
+          <div class="metric-value" id="metric-count">0개</div>
+          <div class="metric-sub" id="metric-urgent">긴급 0개</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">예상 소요시간</div>
+          <div class="metric-value" id="metric-time">00시간 00분</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label" id="metric-remaining-label">취침 전까지</div>
+          <div class="metric-value" id="metric-remaining">00시간 00분</div>
+        </div>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="앱 메뉴">
+      <button class="tab active" type="button" data-tab="plan" aria-selected="true">오늘 계획</button>
+      <button class="tab" type="button" data-tab="tasks" aria-selected="false">할 일 관리</button>
+      <button class="tab" type="button" data-tab="sleep" aria-selected="false">수면 관리</button>
+    </nav>
+
+    <section class="view" id="view-plan">
+      <div class="section-top">
+        <div><h2>오늘의 계획</h2><div class="muted small" id="today-label"></div></div>
+        <span class="today-chip">오늘</span>
+      </div>
+      <section class="card" aria-label="오늘의 목표 달성률">
+        <div class="progress-head">
+          <b>오늘의 목표 달성률</b>
+          <div class="progress-value"><span id="progress-value">0%</span><span class="strawberry hidden" id="progress-strawberry" aria-label="목표 달성">🍓</span></div>
+        </div>
+        <div class="progress-track" role="progressbar" aria-label="오늘의 목표 달성률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+        <button class="btn primary full new-plan hidden" id="new-plan-button" type="button">새로운 계획 만들기</button>
+      </section>
+      <section class="card">
+        <h3>☀️ 오늘 해야 할 일</h3>
+        <div class="task-list" id="today-task-list"></div>
+      </section>
+    </section>
+
+    <section class="view" id="view-tasks" hidden>
+      <h2>할 일 관리</h2>
+      <section class="card form-grid">
+        <h3>＋ 새로운 할 일 추가</h3>
+        <div>
+          <label class="field-label" for="task-name-input">할 일 이름</label>
+          <input class="text-input" id="task-name-input" type="text" maxlength="100" placeholder="예: 전공 과제 제출하기">
+        </div>
+        <div class="two-col">
+          <div>
+            <label class="field-label" for="task-deadline-input">마감 날짜</label>
+            <input class="date-input" id="task-deadline-input" type="date">
+          </div>
+          <div>
+            <label class="field-label" for="task-duration-input">예상 시간</label>
+            <div class="duration-control">
+              <button class="step-btn" type="button" id="task-time-minus" aria-label="예상시간 10분 줄이기">−</button>
+              <input class="text-input" id="task-duration-input" type="text" inputmode="text" value="1시간 00분" aria-label="예상 소요시간">
+              <button class="step-btn" type="button" id="task-time-plus" aria-label="예상시간 10분 늘리기">＋</button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="field-label">계획 방식</div>
+          <div class="mode-switch">
+            <button class="btn selected" type="button" id="mode-auto">자동 배분</button>
+            <button class="btn" type="button" id="mode-daily">매일 반복</button>
+          </div>
+        </div>
+        <div>
+          <button class="btn primary full" type="button" id="add-task-button">할 일 추가하기</button>
+          <div class="muted small" id="task-form-message" role="status" aria-live="polite"></div>
+        </div>
+      </section>
+      <div class="section-top"><h3>등록된 할 일</h3><span class="muted small" id="registered-count">0개</span></div>
+      <div class="task-list" id="registered-task-list"></div>
+    </section>
+
+    <section class="view" id="view-sleep" hidden>
+      <h2>수면 관리 🌙</h2>
+      <section class="card form-grid">
+        <h3>나의 수면 목표</h3>
+        <div class="sleep-row">
+          <div>
+            <label class="field-label" for="wake-time-input">기상 목표 시간</label>
+            <input class="time-input" id="wake-time-input" type="time" value="07:00">
+          </div>
+          <div>
+            <label class="field-label" for="sleep-duration-input">목표 수면 시간</label>
+            <div class="sleep-control">
+              <button class="step-btn" type="button" id="sleep-time-minus" aria-label="수면시간 10분 줄이기">−</button>
+              <div class="sleep-middle">
+                <span class="recommend hidden" id="sleep-recommended">권장</span>
+                <input class="text-input" id="sleep-duration-input" type="text" inputmode="text" value="7시간 00분" aria-label="목표 수면시간">
+              </div>
+              <button class="step-btn" type="button" id="sleep-time-plus" aria-label="수면시간 10분 늘리기">＋</button>
+            </div>
+          </div>
+        </div>
+        <button class="btn primary full" type="button" id="save-sleep-button">수면 목표 저장</button>
+        <div class="muted small" id="sleep-save-message" role="status" aria-live="polite"></div>
+      </section>
+      <section class="card sleep-preview">
+        <div class="muted small">추천 취침 시간</div>
+        <b class="sleep-preview-time" id="sleep-bedtime-preview">00:00</b>
+        <div class="muted small" id="sleep-bedtime-caption">7시간 00분 수면 기준 · 기상 07:00</div>
+      </section>
+    </section>
+
+    <footer class="footer-note">MY DAY · PINK GRAPE EDITION 🍇</footer>
+  </main>
+  <script>
+(() => {
+  'use strict';
+
+  const STORAGE_KEY = 'my-day-strawberry-v1';
+  const $ = (id) => document.getElementById(id);
+  const state = {
+    tasks: [],
+    mode: 'auto',
+    taskEntryMinutes: 60,
+    sleepMinutes: 420,
+    wakeTime: '07:00',
+    activeTab: 'plan',
+    manualOrder: false,
+    lastKnownDate: ''
+  };
+
+  function localDateString(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function dayDifference(fromDate, toDate) {
+    const [fy, fm, fd] = fromDate.split('-').map(Number);
+    const [ty, tm, td] = toDate.split('-').map(Number);
+    return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86400000);
+  }
+
+  function formatDuration(minutes) {
+    const safe = Math.max(0, Math.round(minutes));
+    const hours = Math.floor(safe / 60);
+    const mins = safe % 60;
+    if (hours === 0) return `${mins}분`;
+    return `${hours}시간 ${String(mins).padStart(2, '0')}분`;
+  }
+
+  function formatHeaderDuration(minutes) {
+    const safe = Math.max(0, Math.round(minutes));
+    return `${String(Math.floor(safe / 60)).padStart(2, '0')}시간 ${String(safe % 60).padStart(2, '0')}분`;
+  }
+
+  function parseDuration(value) {
+    const text = String(value || '').trim().replace(/\s+/g, ' ');
+    let match = text.match(/^(\d+)\s*시간(?:\s*(\d+)\s*분)?$/);
+    if (match) return Number(match[1]) * 60 + Number(match[2] || 0);
+    match = text.match(/^(\d+)\s*분$/);
+    if (match) return Number(match[1]);
+    match = text.match(/^(\d{1,3}):(\d{2})$/);
+    if (match && Number(match[2]) < 60) return Number(match[1]) * 60 + Number(match[2]);
+    return null;
+  }
+
+  function loadState() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+      if (!saved || typeof saved !== 'object') return;
+      if (Array.isArray(saved.tasks)) {
+        state.tasks = saved.tasks
+          .filter(task => task && typeof task.name === 'string' && typeof task.deadline === 'string')
+          .map((task, index) => ({
+            id: String(task.id || `${Date.now()}-${index}`),
+            name: task.name,
+            deadline: task.deadline,
+            minutes: Math.max(10, Number(task.minutes) || 60),
+            mode: task.mode === 'daily' ? 'daily' : 'auto',
+            createdDate: task.createdDate || localDateString(),
+            createdAt: Number.isFinite(Number(task.createdAt)) ? Number(task.createdAt) : index,
+            completed: Boolean(task.completed),
+            completedDate: task.completedDate || null
+          }));
+      }
+      state.manualOrder = Boolean(saved.manualOrder);
+      if (Number.isFinite(saved.sleepMinutes)) state.sleepMinutes = Math.max(10, Math.min(1440, saved.sleepMinutes));
+      if (typeof saved.wakeTime === 'string' && /^\d{2}:\d{2}$/.test(saved.wakeTime)) state.wakeTime = saved.wakeTime;
+    } catch (error) {
+      console.warn('MY DAY 저장 데이터를 불러오지 못했습니다.', error);
+    }
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        tasks: state.tasks,
+        manualOrder: state.manualOrder,
+        sleepMinutes: state.sleepMinutes,
+        wakeTime: state.wakeTime
+      }));
+    } catch (error) {
+      console.warn('MY DAY 데이터를 저장하지 못했습니다.', error);
+    }
+  }
+
+  function isTaskDoneToday(task) {
+    if (task.mode === 'daily') return task.completedDate === localDateString();
+    return task.completed;
+  }
+
+  function daysUntilDeadline(task) {
+    return dayDifference(localDateString(), task.deadline);
+  }
+
+  function isUrgentTask(task) {
+    const days = daysUntilDeadline(task);
+    return days >= 0 && days <= 2;
+  }
+
+  function getTodayAllocation(task) {
+    if (task.mode === 'daily') return task.minutes;
+    const daysRemaining = Math.max(1, daysUntilDeadline(task) + 1);
+    return Math.ceil(task.minutes / daysRemaining / 10) * 10;
+  }
+
+  function isInTodayPlan(task) {
+    if (task.deadline < localDateString()) return false;
+    if (task.mode === 'daily') return true;
+    if (task.completed && task.completedDate !== localDateString()) return false;
+    return getTodayAllocation(task) > 0;
+  }
+
+  function taskSortRank(task) {
+    if (isUrgentTask(task)) return 0;
+    if (task.mode === 'daily') return 1;
+    return 2;
+  }
+
+  function applyDefaultTaskOrder() {
+    if (state.manualOrder) return;
+    state.tasks.sort((a, b) => taskSortRank(a) - taskSortRank(b) ||
+      (taskSortRank(a) === 0 ? daysUntilDeadline(a) - daysUntilDeadline(b) : 0) ||
+      a.createdAt - b.createdAt);
+  }
+
+  function getTodaysTasks() {
+    return state.tasks.filter(isInTodayPlan);
+  }
+
+  function setTab(tabName) {
+    state.activeTab = tabName;
+    document.querySelectorAll('[data-tab]').forEach(button => {
+      const selected = button.dataset.tab === tabName;
+      button.classList.toggle('active', selected);
+      button.setAttribute('aria-selected', String(selected));
+    });
+    ['plan', 'tasks', 'sleep'].forEach(name => {
+      $(`view-${name}`).hidden = name !== tabName;
+    });
+  }
+
+  function createIndicator(label, className) {
+    const wrapper = document.createElement('span');
+    wrapper.className = `indicator ${className}`;
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    const text = document.createElement('span');
+    text.textContent = label;
+    wrapper.append(dot, text);
+    return wrapper;
+  }
+
+  function createTaskCard(task, showDelete = false, draggable = false) {
+    const card = document.createElement('article');
+    card.className = `task-card${isTaskDoneToday(task) ? ' is-done' : ''}`;
+    card.dataset.taskId = task.id;
+    if (draggable) card.draggable = true;
+
+    const indicators = document.createElement('div');
+    indicators.className = 'task-indicators';
+    if (task.mode === 'daily') indicators.append(createIndicator('매일', 'daily'));
+    if (isUrgentTask(task)) indicators.append(createIndicator('긴급', 'urgent'));
+    if (indicators.childElementCount > 0) card.append(indicators);
+
+    const main = document.createElement('div');
+    main.className = 'task-main';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'task-check';
+    checkbox.checked = isTaskDoneToday(task);
+    checkbox.setAttribute('aria-label', `${task.name} 완료`);
+    checkbox.addEventListener('change', () => {
+      if (task.mode === 'daily') {
+        task.completedDate = checkbox.checked ? localDateString() : null;
+      } else {
+        task.completed = checkbox.checked;
+        task.completedDate = checkbox.checked ? localDateString() : null;
+      }
+      saveState();
+      render();
+    });
+
+    const info = document.createElement('div');
+    info.className = 'task-info';
+    const name = document.createElement('div');
+    name.className = 'task-name';
+    name.textContent = task.name;
+    const meta = document.createElement('div');
+    meta.className = 'task-meta';
+    if (task.mode === 'auto') {
+      meta.textContent = `오늘 ${formatDuration(getTodayAllocation(task))} 배정 · 총 ${formatDuration(task.minutes)} · 마감 ${task.deadline}`;
+    } else {
+      meta.textContent = `하루 ${formatDuration(task.minutes)} · 마감 ${task.deadline}`;
+    }
+    info.append(name, meta);
+    main.append(checkbox, info);
+
+    if (showDelete) {
+      const deleteButton = document.createElement('button');
+      deleteButton.type = 'button';
+      deleteButton.className = 'btn';
+      deleteButton.textContent = '삭제';
+      deleteButton.setAttribute('aria-label', `${task.name} 삭제`);
+      deleteButton.addEventListener('click', () => {
+        state.tasks = state.tasks.filter(item => item.id !== task.id);
+        saveState();
+        render();
+      });
+      main.append(deleteButton);
+    }
+    card.append(main);
+    return card;
+  }
+
+  function reorderTasksFromRegistry() {
+    const registry = $('registered-task-list');
+    const ids = [...registry.querySelectorAll('.task-card[data-task-id]')].map(card => card.dataset.taskId);
+    if (ids.length !== state.tasks.length) return;
+    const byId = new Map(state.tasks.map(task => [task.id, task]));
+    const reordered = ids.map(id => byId.get(id)).filter(Boolean);
+    if (reordered.length !== state.tasks.length) return;
+    state.tasks = reordered;
+    state.manualOrder = true;
+    saveState();
+    render();
+  }
+
+  function bindTaskReordering() {
+    const registry = $('registered-task-list');
+    if (registry.dataset.dragBound === 'true') return;
+    registry.dataset.dragBound = 'true';
+
+    let mouseDraggedId = null;
+    registry.addEventListener('dragstart', event => {
+      const card = event.target.closest('.task-card[draggable="true"]');
+      if (!card || event.target.closest('input, button')) { event.preventDefault(); return; }
+      mouseDraggedId = card.dataset.taskId;
+      card.classList.add('dragging');
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', mouseDraggedId);
+      }
+    });
+    registry.addEventListener('dragover', event => {
+      if (!mouseDraggedId) return;
+      event.preventDefault();
+      const moving = registry.querySelector(`[data-task-id="${CSS.escape(mouseDraggedId)}"]`);
+      const target = event.target.closest('.task-card[draggable="true"]');
+      if (!moving || !target || target === moving) return;
+      const rect = target.getBoundingClientRect();
+      const insertAfter = event.clientY > rect.top + rect.height / 2;
+      registry.insertBefore(moving, insertAfter ? target.nextSibling : target);
+    });
+    registry.addEventListener('drop', event => {
+      if (!mouseDraggedId) return;
+      event.preventDefault();
+      mouseDraggedId = null;
+      reorderTasksFromRegistry();
+    });
+    registry.addEventListener('dragend', () => {
+      mouseDraggedId = null;
+      registry.querySelectorAll('.dragging').forEach(card => card.classList.remove('dragging'));
+    });
+
+    let touchDrag = null;
+    registry.addEventListener('touchstart', event => {
+      const card = event.target.closest('.task-card[data-task-id]');
+      if (!card || event.target.closest('input, button') || !event.touches.length) return;
+      const touch = event.touches[0];
+      touchDrag = {
+        card,
+        identifier: touch.identifier,
+        startX: touch.clientX,
+        startY: touch.clientY,
+        active: false,
+        timer: window.setTimeout(() => {
+          if (!touchDrag) return;
+          touchDrag.active = true;
+          card.classList.add('dragging');
+        }, 220)
+      };
+    }, { passive: true });
+
+    registry.addEventListener('touchmove', event => {
+      if (!touchDrag) return;
+      const touch = [...event.touches].find(item => item.identifier === touchDrag.identifier);
+      if (!touch) return;
+      if (!touchDrag.active) {
+        const moved = Math.hypot(touch.clientX - touchDrag.startX, touch.clientY - touchDrag.startY);
+        if (moved > 9) {
+          clearTimeout(touchDrag.timer);
+          touchDrag = null;
+        }
+        return;
+      }
+      event.preventDefault();
+      const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.task-card[data-task-id]');
+      if (!target || !registry.contains(target) || target === touchDrag.card) return;
+      const rect = target.getBoundingClientRect();
+      const insertAfter = touch.clientY > rect.top + rect.height / 2;
+      registry.insertBefore(touchDrag.card, insertAfter ? target.nextSibling : target);
+    }, { passive: false });
+
+    const finishTouchDrag = () => {
+      if (!touchDrag) return;
+      clearTimeout(touchDrag.timer);
+      const didMove = touchDrag.active;
+      touchDrag.card.classList.remove('dragging');
+      touchDrag = null;
+      if (didMove) reorderTasksFromRegistry();
+    };
+    registry.addEventListener('touchend', finishTouchDrag);
+    registry.addEventListener('touchcancel', finishTouchDrag);
+  }
+
+  function renderTaskLists(todayTasks) {
+    const todayList = $('today-task-list');
+    todayList.replaceChildren();
+    if (todayTasks.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = '오늘 계획된 할 일이 없어요.';
+      todayList.append(empty);
+    } else {
+      todayTasks.forEach(task => todayList.append(createTaskCard(task)));
+    }
+
+    const registry = $('registered-task-list');
+    registry.replaceChildren();
+    if (state.tasks.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = '아직 등록된 할 일이 없어요. 첫 번째 계획을 추가해 보세요!';
+      registry.append(empty);
+    } else {
+      state.tasks.forEach(task => registry.append(createTaskCard(task, true, true)));
+    }
+    $('registered-count').textContent = `${state.tasks.length}개`;
+    bindTaskReordering();
+  }
+
+  function getBedtimeMinutes() {
+    const [hour, minute] = state.wakeTime.split(':').map(Number);
+    return (hour * 60 + minute - state.sleepMinutes + 1440) % 1440;
+  }
+
+  function getCountdownInfo(now = new Date()) {
+    const [wakeHour, wakeMinute] = state.wakeTime.split(':').map(Number);
+    const wakeMinutes = wakeHour * 60 + wakeMinute;
+    const bedtimeMinutes = getBedtimeMinutes();
+    const preparationStartMinutes = (bedtimeMinutes - 30 + 1440) % 1440;
+    const currentMinutes = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+    const sleepWindowMinutes = (wakeMinutes - preparationStartMinutes + 1440) % 1440;
+    const elapsedFromPreparation = (currentMinutes - preparationStartMinutes + 1440) % 1440;
+    const inSleepPhase = elapsedFromPreparation < sleepWindowMinutes;
+
+    const targetMinutes = inSleepPhase ? wakeMinutes : preparationStartMinutes;
+    const target = new Date(now);
+    target.setHours(Math.floor(targetMinutes / 60), targetMinutes % 60, 0, 0);
+    if (target <= now) target.setDate(target.getDate() + 1);
+
+    return {
+      label: inSleepPhase ? '기상까지' : '취침 전까지',
+      minutes: Math.max(0, Math.ceil((target.getTime() - now.getTime()) / 60000))
+    };
+  }
+
+  function renderRemainingDay() {
+    const countdown = getCountdownInfo();
+    $('metric-remaining-label').textContent = countdown.label;
+    $('metric-remaining').textContent = formatHeaderDuration(countdown.minutes);
+  }
+
+  function renderSleep() {
+    const bedtimeMinutes = getBedtimeMinutes();
+    const bedtime = `${String(Math.floor(bedtimeMinutes / 60)).padStart(2, '0')}:${String(bedtimeMinutes % 60).padStart(2, '0')}`;
+    $('sleep-bedtime-preview').textContent = bedtime;
+    $('sleep-bedtime-caption').textContent = `${formatDuration(state.sleepMinutes)} 수면 기준 · 기상 ${state.wakeTime}`;
+    $('sleep-duration-input').value = formatDuration(state.sleepMinutes);
+    $('wake-time-input').value = state.wakeTime;
+    $('sleep-recommended').classList.toggle('hidden', state.sleepMinutes !== 420);
+  }
+
+  function render() {
+    applyDefaultTaskOrder();
+    const todayTasks = getTodaysTasks();
+    const doneCount = todayTasks.filter(isTaskDoneToday).length;
+    const progress = todayTasks.length ? Math.round(doneCount / todayTasks.length * 100) : 0;
+    const totalMinutes = todayTasks.reduce((sum, task) => sum + getTodayAllocation(task), 0);
+    const urgentCount = todayTasks.filter(task => !isTaskDoneToday(task) && isUrgentTask(task)).length;
+
+    $('metric-count').textContent = `${todayTasks.length}개`;
+    $('metric-time').textContent = formatHeaderDuration(totalMinutes);
+    $('metric-urgent').textContent = `긴급 ${urgentCount}개`;
+    $('progress-value').textContent = `${progress}%`;
+    $('progress-fill').style.width = `${progress}%`;
+    $('progress-track').setAttribute('aria-valuenow', String(progress));
+    const allDone = todayTasks.length > 0 && progress === 100;
+    $('progress-strawberry').classList.toggle('hidden', !allDone);
+    $('new-plan-button').classList.toggle('hidden', !allDone);
+    $('today-label').textContent = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' });
+    renderTaskLists(todayTasks);
+    renderRemainingDay();
+    renderSleep();
+  }
+
+  function changeTaskDuration(delta) {
+    const entered = parseDuration($('task-duration-input').value);
+    if (entered !== null && entered >= 10 && entered <= 5999) state.taskEntryMinutes = entered;
+    state.taskEntryMinutes = Math.max(10, Math.min(5999, state.taskEntryMinutes + delta));
+    $('task-duration-input').value = formatDuration(state.taskEntryMinutes);
+    $('task-form-message').textContent = '';
+  }
+
+  function normalizeTaskDuration() {
+    const parsed = parseDuration($('task-duration-input').value);
+    if (parsed === null || parsed < 10 || parsed > 5999) return false;
+    state.taskEntryMinutes = parsed;
+    $('task-duration-input').value = formatDuration(parsed);
+    return true;
+  }
+
+  function changeSleepDuration(delta) {
+    const entered = parseDuration($('sleep-duration-input').value);
+    if (entered !== null && entered >= 10 && entered <= 1440) state.sleepMinutes = entered;
+    state.sleepMinutes = Math.max(10, Math.min(1440, state.sleepMinutes + delta));
+    $('sleep-duration-input').value = formatDuration(state.sleepMinutes);
+    $('sleep-recommended').classList.toggle('hidden', state.sleepMinutes !== 420);
+  }
+
+  function normalizeSleepDuration() {
+    const parsed = parseDuration($('sleep-duration-input').value);
+    if (parsed === null || parsed < 10 || parsed > 1440) return false;
+    state.sleepMinutes = parsed;
+    $('sleep-duration-input').value = formatDuration(parsed);
+    $('sleep-recommended').classList.toggle('hidden', parsed !== 420);
+    return true;
+  }
+
+  function setMode(mode) {
+    state.mode = mode;
+    $('mode-auto').classList.toggle('selected', mode === 'auto');
+    $('mode-daily').classList.toggle('selected', mode === 'daily');
+  }
+
+  function addTask() {
+    const name = $('task-name-input').value.trim();
+    const deadline = $('task-deadline-input').value;
+    const duration = parseDuration($('task-duration-input').value);
+    const message = $('task-form-message');
+    if (!name || !deadline) {
+      message.textContent = '할 일 이름과 마감 날짜를 입력해 줘.';
+      return;
+    }
+    if (duration === null || duration < 10 || duration > 5999) {
+      message.textContent = '예: 1시간 30분 또는 90분으로 입력해 줘.';
+      return;
+    }
+    if (deadline < localDateString()) {
+      message.textContent = '마감 날짜는 오늘이나 이후 날짜로 설정해 줘.';
+      return;
+    }
+    const task = {
+      id: (window.crypto && typeof window.crypto.randomUUID === 'function') ? window.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name,
+      deadline,
+      minutes: duration,
+      mode: state.mode,
+      createdDate: localDateString(),
+      createdAt: Date.now(),
+      completed: false,
+      completedDate: null
+    };
+    state.tasks.push(task);
+    applyDefaultTaskOrder();
+    saveState();
+    $('task-name-input').value = '';
+    state.taskEntryMinutes = 60;
+    $('task-duration-input').value = formatDuration(60);
+    message.textContent = '새 할 일이 추가됐어!';
+    render();
+  }
+
+  function saveSleepSettings() {
+    if (!normalizeSleepDuration()) {
+      $('sleep-save-message').textContent = '수면시간을 예: 7시간 30분 형식으로 입력해 줘.';
+      return;
+    }
+    state.wakeTime = $('wake-time-input').value || '07:00';
+    saveState();
+    renderSleep();
+    renderRemainingDay();
+    $('sleep-save-message').textContent = '수면 목표가 저장됐어.';
+  }
+
+  function handleCalendarChange() {
+    const today = localDateString();
+    if (state.lastKnownDate !== today) {
+      state.tasks.forEach(task => {
+        if (task.mode === 'daily' && task.completedDate !== today) task.completedDate = null;
+      });
+      state.lastKnownDate = today;
+      applyDefaultTaskOrder();
+      saveState();
+      render();
+      return;
+    }
+    renderRemainingDay();
+  }
+
+  function scheduleCalendarRefresh() {
+    window.setInterval(handleCalendarChange, 10000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) handleCalendarChange(); });
+    window.addEventListener('focus', handleCalendarChange);
+  }
+
+  document.querySelectorAll('[data-tab]').forEach(button => {
+    button.addEventListener('click', () => setTab(button.dataset.tab));
+  });
+  $('new-plan-button').addEventListener('click', () => setTab('tasks'));
+  $('mode-auto').addEventListener('click', () => setMode('auto'));
+  $('mode-daily').addEventListener('click', () => setMode('daily'));
+  $('task-time-minus').addEventListener('click', () => changeTaskDuration(-10));
+  $('task-time-plus').addEventListener('click', () => changeTaskDuration(10));
+  $('task-duration-input').addEventListener('blur', () => {
+    if (!normalizeTaskDuration()) $('task-form-message').textContent = '예: 1시간 30분 또는 90분으로 입력해 줘.';
+    else $('task-form-message').textContent = '';
+  });
+  $('task-duration-input').addEventListener('input', () => { $('task-form-message').textContent = ''; });
+  $('add-task-button').addEventListener('click', addTask);
+  $('task-name-input').addEventListener('keydown', event => { if (event.key === 'Enter') addTask(); });
+  $('sleep-time-minus').addEventListener('click', () => changeSleepDuration(-10));
+  $('sleep-time-plus').addEventListener('click', () => changeSleepDuration(10));
+  $('sleep-duration-input').addEventListener('input', () => {
+    const parsed = parseDuration($('sleep-duration-input').value);
+    $('sleep-recommended').classList.toggle('hidden', parsed !== 420);
+  });
+  $('sleep-duration-input').addEventListener('blur', () => {
+    if (!normalizeSleepDuration()) $('sleep-save-message').textContent = '예: 7시간 30분 또는 450분으로 입력해 줘.';
+    else $('sleep-save-message').textContent = '';
+  });
+  $('save-sleep-button').addEventListener('click', saveSleepSettings);
+  $('wake-time-input').addEventListener('change', () => {
+    state.wakeTime = $('wake-time-input').value || '07:00';
+    saveState();
+    renderSleep();
+    renderRemainingDay();
+  });
+
+  loadState();
+  state.lastKnownDate = localDateString();
+  state.tasks.forEach(task => {
+    if (task.mode === 'daily' && task.completedDate !== state.lastKnownDate) task.completedDate = null;
+  });
+  $('task-deadline-input').min = localDateString();
+  $('task-deadline-input').value = localDateString();
+  $('task-duration-input').value = formatDuration(state.taskEntryMinutes);
+  $('sleep-duration-input').value = formatDuration(state.sleepMinutes);
+  $('wake-time-input').value = state.wakeTime;
+  $('sleep-recommended').classList.toggle('hidden', state.sleepMinutes !== 420);
+  setMode('auto');
+  applyDefaultTaskOrder();
+  render();
+  saveState();
+  scheduleCalendarRefresh();
+})();
+
+</script>
+<script>
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
