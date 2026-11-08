@@ -136,10 +136,10 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     
 .delete-btn {
   flex: 0 0 auto;
-  width: 30px;
-  min-width: 30px;
-  height: 20px;
-  padding: 0 0px;
+  width: 40px;
+  min-width: 40px;
+  height: 30px;
+  padding: 2px 3px;
   font-size: 10px;
 }
     
@@ -570,7 +570,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     info.append(name, meta);
     main.append(checkbox, info);
 
-   if (!isTaskDoneToday(task)) {
+   if (!isTaskDoneToday(task) && !showDelete) {
   const active = state.taskTimer.taskId === task.id;
 
   const timerActions = document.createElement('div');
