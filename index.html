@@ -272,7 +272,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     activeTab: 'plan',
     manualOrder: false,
     lastKnownDate: '',
-    taskTimer: { taskId: null, remainingMs: 0, startedAt: null, paused: false }
+    taskTimer: { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false }
   };
 
   function localDateString(date = new Date()) {
@@ -309,27 +309,28 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
       : Math.max(0, timer.remainingMs);
   }
 
-  function formatTaskTimer(ms) {
-    const seconds = Math.max(0, Math.ceil(ms / 1000));
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  function getTimerElapsedMs() {
+    const timer = state.taskTimer;
+    if (!timer || !timer.taskId) return 0;
+    const total = Math.max(0, Number(timer.totalMs) || Number(timer.remainingMs) || 0);
+    return Math.max(0, total - getTimerRemainingMs());
   }
 
   function startTaskTimer(task) {
     if (!task || isTaskDoneToday(task)) return;
     const timer = state.taskTimer;
     if (timer.taskId === task.id) {
-      if (timer.remainingMs <= 0) return;
+      if (getTimerRemainingMs() <= 0) return;
       if (timer.startedAt === null) {
         timer.startedAt = Date.now();
         timer.paused = false;
       }
     } else {
+      const durationMs = Math.max(1, Number(getTodayAllocation(task)) || 1) * 60000;
       state.taskTimer = {
         taskId: task.id,
-        remainingMs: Math.max(1, Number(task.minutes) || 60) * 60000,
+        remainingMs: durationMs,
+        totalMs: durationMs,
         startedAt: Date.now(),
         paused: false
       };
@@ -349,27 +350,35 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
   }
 
   function stopTaskTimer() {
-    state.taskTimer = { taskId: null, remainingMs: 0, startedAt: null, paused: false };
+    state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false };
     saveState();
     render();
   }
 
+  function completeExpiredTaskTimer() {
+    const timer = state.taskTimer;
+    if (!timer.taskId || timer.startedAt === null || getTimerRemainingMs() > 0) return false;
+    const task = state.tasks.find(item => item.id === timer.taskId);
+    if (task && !isTaskDoneToday(task)) {
+      if (task.mode === 'daily') {
+        task.completedDate = localDateString();
+      } else {
+        task.completed = true;
+        task.completedDate = localDateString();
+      }
+    }
+    state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false };
+    saveState();
+    return true;
+  }
+
   function renderHeaderTaskTimer() {
     const timer = state.taskTimer;
-    if (!timer.taskId) return false;
-    if (!state.tasks.some(task => task.id === timer.taskId)) {
-      state.taskTimer = { taskId: null, remainingMs: 0, startedAt: null, paused: false };
-      return false;
-    }
-    const remaining = getTimerRemainingMs();
-    const expired = remaining <= 0 && timer.startedAt !== null;
-    if (expired) {
-      timer.remainingMs = 0;
-      timer.startedAt = null;
-      timer.paused = true;
-    }
-    $('metric-time').textContent = formatTaskTimer(remaining);
-    return expired;
+    if (!timer.taskId) return;
+    const remainingTasks = getTodaysTasks().filter(task => !isTaskDoneToday(task));
+    const totalMinutes = remainingTasks.reduce((sum, task) => sum + getTodayAllocation(task), 0);
+    const remainingMs = Math.max(0, totalMinutes * 60000 - getTimerElapsedMs());
+    $('metric-time').textContent = formatHeaderDuration(Math.ceil(remainingMs / 60000));
   }
 
   function parseDuration(value) {
@@ -410,6 +419,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
         state.taskTimer = {
           taskId: saved.taskTimer.taskId,
           remainingMs: Math.max(0, Number(saved.taskTimer.remainingMs) || 0),
+          totalMs: Math.max(0, Number(saved.taskTimer.totalMs) || Number(saved.taskTimer.remainingMs) || 0),
           startedAt: saved.taskTimer.startedAt === null ? null : Number(saved.taskTimer.startedAt),
           paused: Boolean(saved.taskTimer.paused)
         };
@@ -528,7 +538,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
         task.completedDate = checkbox.checked ? localDateString() : null;
       }
       if (checkbox.checked && state.taskTimer.taskId === task.id) {
-        state.taskTimer = { taskId: null, remainingMs: 0, startedAt: null, paused: false };
+        state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false };
       }
       saveState();
       render();
@@ -589,7 +599,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
       deleteButton.addEventListener('click', () => {
         state.tasks = state.tasks.filter(item => item.id !== task.id);
         if (state.taskTimer.taskId === task.id) {
-          state.taskTimer = { taskId: null, remainingMs: 0, startedAt: null, paused: false };
+          state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false };
         }
         saveState();
         render();
@@ -770,11 +780,12 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
   }
 
   function render() {
+    completeExpiredTaskTimer();
     applyDefaultTaskOrder();
     const todayTasks = getTodaysTasks();
     const doneCount = todayTasks.filter(isTaskDoneToday).length;
     const progress = todayTasks.length ? Math.round(doneCount / todayTasks.length * 100) : 0;
-    const totalMinutes = todayTasks.reduce((sum, task) => sum + getTodayAllocation(task), 0);
+    const totalMinutes = todayTasks.reduce((sum, task) => sum + (isTaskDoneToday(task) ? 0 : getTodayAllocation(task)), 0);
     const urgentCount = todayTasks.filter(task => !isTaskDoneToday(task) && isUrgentTask(task)).length;
 
     $('metric-count').textContent = `${todayTasks.length}개`;
@@ -885,6 +896,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
   function handleCalendarChange() {
     const today = localDateString();
     if (state.lastKnownDate !== today) {
+      if (state.taskTimer.taskId) state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false };
       state.tasks.forEach(task => {
         if (task.mode === 'daily' && task.completedDate !== today) task.completedDate = null;
       });
@@ -900,9 +912,11 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
   function scheduleCalendarRefresh() {
     window.setInterval(() => {
       if (state.taskTimer.taskId && state.taskTimer.startedAt !== null) {
-        if (renderHeaderTaskTimer()) {
-          saveState();
+        if (getTimerRemainingMs() <= 0) {
+          completeExpiredTaskTimer();
           render();
+        } else {
+          renderHeaderTaskTimer();
         }
       }
     }, 250);
