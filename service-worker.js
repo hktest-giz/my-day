@@ -1,4 +1,5 @@
 /* MY DAY offline cache. Increment the version when app files change. */
+/*캐시와 앱 업데이트 즉, 파일을 저장하고 다시 불러오기*/
 const CACHE_NAME = 'my-day-pink-grape-v5';
 const APP_FILES = [
   './',
