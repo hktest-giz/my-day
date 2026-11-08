@@ -86,8 +86,9 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
 .task-card.is-done .task-name { text-decoration: line-through; opacity: .65; }
 .task-meta { margin-top: 3px; color: var(--sub); font-size: 11px; font-weight: 600; overflow-wrap: anywhere; }
 .task-actions { display: flex; align-items: center; gap: 4px; flex: none; }
-.task-timer-btn { position: absolute; top: 14px; right: 14px; border: 1px solid var(--pink); border-radius: 9px; padding: 8px 10px; background: #FFF5F8; color: var(--ink); font-size: 11px; font-weight: 800; white-space: nowrap; }
+.task-timer-btn { border: 1px solid var(--pink); border-radius: 9px; padding: 8px 10px; background: #FFF5F8; color: var(--ink); font-size: 11px; font-weight: 800; white-space: nowrap; }
 .task-timer-btn.active { background: var(--pink); }
+.timer-actions { position: absolute; top: 14px; right: 14px; display: flex; align-items: center; gap: 6px; }
 .task-timer-btn:disabled { opacity: .55; cursor: default; }
 .empty { padding: 19px 8px; text-align: center; color: var(--sub); font-size: 12px; font-weight: 600; }
 .form-grid { display: grid; gap: 13px; }
@@ -569,36 +570,44 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     info.append(name, meta);
     main.append(checkbox, info);
 
-    if (!isTaskDoneToday(task)) {
-      const active = state.taskTimer.taskId === task.id;
-      const timerButton = document.createElement('button');
-      timerButton.type = 'button';
-      timerButton.className = `task-timer-btn${active ? ' active' : ''}`;
+   if (!isTaskDoneToday(task)) {
+  const active = state.taskTimer.taskId === task.id;
 
-      if (active && getTimerRemainingMs() <= 0) {
-        timerButton.textContent = '시간 종료';
-        timerButton.disabled = true;
-      } else if (active && state.taskTimer.startedAt !== null) {
-        timerButton.textContent = '일시정지';
-        timerButton.addEventListener('click', pauseTaskTimer);
-      } else if (active) {
-        timerButton.textContent = '계속';
-        timerButton.addEventListener('click', () => startTaskTimer(task));
-      } else {
-        timerButton.textContent = '시작';
-        timerButton.addEventListener('click', () => startTaskTimer(task));
-      }
-      main.append(timerButton);
+  const timerActions = document.createElement('div');
+  timerActions.className = 'timer-actions';
 
-      if (active) {
-        const stopButton = document.createElement('button');
-        stopButton.type = 'button';
-        stopButton.className = 'btn';
-        stopButton.textContent = '종료';
-        stopButton.addEventListener('click', stopTaskTimer);
-        main.append(stopButton);
-      }
-    }
+  const timerButton = document.createElement('button');
+  timerButton.type = 'button';
+  timerButton.className = `task-timer-btn${active ? ' active' : ''}`;
+
+  if (active && getTimerRemainingMs() <= 0) {
+    timerButton.textContent = '시간 종료';
+    timerButton.disabled = true;
+  } else if (active && state.taskTimer.startedAt !== null) {
+    timerButton.textContent = '일시정지';
+    timerButton.addEventListener('click', pauseTaskTimer);
+  } else if (active) {
+    timerButton.textContent = '계속';
+    timerButton.addEventListener('click', () => startTaskTimer(task));
+  } else {
+    timerButton.textContent = '시작';
+    timerButton.addEventListener('click', () => startTaskTimer(task));
+  }
+
+  timerActions.append(timerButton);
+
+  if (active) {
+    const stopButton = document.createElement('button');
+    stopButton.type = 'button';
+    stopButton.className = 'btn';
+    stopButton.textContent = '종료';
+    stopButton.addEventListener('click', stopTaskTimer);
+
+    timerActions.append(stopButton);
+  }
+
+  card.append(timerActions);
+}
 
     if (showDelete) {
       const deleteButton = document.createElement('button');
