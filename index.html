@@ -36,8 +36,10 @@ button { cursor: pointer; }
 .app-shell { width: min(100% - 32px, 620px); margin: 0 auto; padding: 22px 0 36px; }
 .hero { padding: 22px; border-radius: 22px; background: var(--pink); box-shadow: var(--shadow); }
 .hero-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
-.brand { display: inline-flex; align-items: center; gap: 5px; }
+.brand { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 0; }
 .brand img { display: block; width: 25px; height: 25px; border-radius: 7px; }
+.brand-main { white-space: nowrap; }
+.brand-sub { display: block; font-size: 8px; font-weight: 400; margin-left: 25px; }
 .hero h1 { font-size: 25px; line-height: 1.25; margin: 20px 0 5px; font-weight: 850; letter-spacing: -.04em; }
 .hero-subtitle { margin: 0; font-size: 12px; font-weight: 650; }
 .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 21px; }
@@ -68,7 +70,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
 .btn:focus-visible, .tab:focus-visible, input:focus-visible { outline: 2px solid #C77D95; outline-offset: 2px; }
 .new-plan { margin-top: 12px; }
 .task-list { display: grid; gap: 9px; margin-top: 12px; }
-.task-card { display: flex; flex-direction: column; gap: 9px; min-width: 0; padding: 11px; border: 1px solid var(--line); border-radius: 12px; background: white; }
+.task-card { position: relative; display: flex; flex-direction: column; gap: 9px; min-width: 0; padding: 11px; border: 1px solid var(--line); border-radius: 12px; background: white; }
 .task-card[draggable="true"] { cursor: grab; touch-action: auto; user-select: none; -webkit-user-select: none; }
 .task-card.dragging { opacity: .48; border: 1px dashed #D994AA; background: #FFF5F7; }
 .task-card.drag-over { border-color: #D994AA; }
@@ -88,7 +90,8 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
 .task-actions { display: flex; align-items: center; gap: 4px; flex: none; }
 .task-timer-btn { border: 1px solid var(--pink); border-radius: 9px; padding: 8px 10px; background: #FFF5F8; color: var(--ink); font-size: 11px; font-weight: 800; white-space: nowrap; }
 .task-timer-btn.active { background: var(--pink); }
-.task-timer-btn:disabled { opacity: .55; cursor: default; }
+.timer-actions { position: absolute; top: 4px; right: 14px; display: flex; flex-direction: row; align-items: center; gap: 6px; width: max-content; flex-wrap: nowrap; }.task-timer-btn:disabled { opacity: .55; cursor: default; }
+.timer-actions button { padding: 2px 3px; font-size: 9px; min-width: 40px; height: 28px; }
 .empty { padding: 19px 8px; text-align: center; color: var(--sub); font-size: 12px; font-weight: 600; }
 .form-grid { display: grid; gap: 13px; }
 .field-label { display: block; margin-bottom: 5px; color: var(--ink); font-size: 12px; font-weight: 800; }
@@ -124,12 +127,22 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
   .step-btn { width: 26px; }
 }
     
-@media (max-width: 600px) {
+@media (max-width: 600px) and (hover: none) and (pointer: coarse) {
   #task-deadline-input,
   #wake-time-input {
     width: 85%;
     height: 22px;
+    box-sizing: border-box;
   }
+}
+    
+.delete-btn {
+  flex: 0 0 auto;
+  width: 40px;
+  min-width: 40px;
+  height: 30px;
+  padding: 2px 3px;
+  font-size: 10px;
 }
     
   </style>
@@ -139,8 +152,8 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
   <main class="app-shell">
     <header class="hero">
       <div class="hero-top">
-        <span>MY PERSONAL PLANNER</span>
-        <span class="brand"><span aria-hidden="true" style="font-size:24px">🍇</span> MY DAY</span>
+        <span>MY PERSONAL PLANNER </span>
+        <span class="brand"><span class="brand-main"><span aria-hidden="true" style="font-size:20px">🍇</span> MY DAY</span><span class="brand-sub">: 100 Hours</span></span>
       </div>
       <h1>나의 하루를 계획해요</h1>
       <p class="hero-subtitle">Practice makes perfect.</p>
@@ -192,7 +205,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
         <h3>＋ 새로운 할 일 추가</h3>
         <div>
           <label class="field-label" for="task-name-input">할 일</label>
-          <input class="text-input" id="task-name-input" type="text" maxlength="100" placeholder="ONE BY ONE">
+          <input class="text-input" id="task-name-input" type="text" maxlength="100" placeholder="ONE BY ONE : 딱 100시간만 해보자">
         </div>
         <div class="two-col">
           <div>
@@ -365,7 +378,6 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
       } else {
         task.completed = true;
         task.completedDate = localDateString();
-        task.completedMinutes = getTodayAllocation(task);
       }
     }
     state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false };
@@ -404,13 +416,12 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
             id: String(task.id || `${Date.now()}-${index}`),
             name: task.name,
             deadline: task.deadline,
-            minutes: Math.max(0, Number.isFinite(Number(task.minutes)) ? Number(task.minutes) : 60),
+            minutes: Math.max(10, Number(task.minutes) || 60),
             mode: task.mode === 'daily' ? 'daily' : 'auto',
             createdDate: task.createdDate || localDateString(),
             createdAt: Number.isFinite(Number(task.createdAt)) ? Number(task.createdAt) : index,
             completed: Boolean(task.completed),
-            completedDate: task.completedDate || null,
-            completedMinutes: Math.max(0, Number(task.completedMinutes) || 0)
+            completedDate: task.completedDate || null
           }));
       }
       state.manualOrder = Boolean(saved.manualOrder);
@@ -447,9 +458,8 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
   }
 
   function isTaskDoneToday(task) {
-    return task.mode === 'daily'
-      ? task.completedDate === localDateString()
-      : task.completed && task.completedDate === localDateString();
+    if (task.mode === 'daily') return task.completedDate === localDateString();
+    return task.completed;
   }
 
   function daysUntilDeadline(task) {
@@ -461,38 +471,16 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     return days >= 0 && days <= 2;
   }
 
-  function settleCompletedAutoTasks(today = localDateString()) {
-    state.tasks.forEach(task => {
-      if (task.mode !== 'auto') return;
-
-      if (task.completed && task.completedDate && task.completedDate < today) {
-        const completedMinutes = Math.max(
-          0,
-          Number(task.completedMinutes) || 0
-        );
-
-        task.minutes = Math.max(0, task.minutes - completedMinutes);
-        task.completed = false;
-        task.completedDate = null;
-        task.completedMinutes = 0;
-      }
-    });
-  }
-
   function getTodayAllocation(task) {
     if (task.mode === 'daily') return task.minutes;
-    if (task.minutes <= 0) return 0;
-
     const daysRemaining = Math.max(1, daysUntilDeadline(task) + 1);
-    return Math.min(
-      task.minutes,
-      Math.ceil(task.minutes / daysRemaining / 10) * 10
-    );
+    return Math.ceil(task.minutes / daysRemaining / 10) * 10;
   }
 
   function isInTodayPlan(task) {
     if (task.deadline < localDateString()) return false;
     if (task.mode === 'daily') return true;
+    if (task.completed && task.completedDate !== localDateString()) return false;
     return getTodayAllocation(task) > 0;
   }
 
@@ -561,9 +549,6 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
       } else {
         task.completed = checkbox.checked;
         task.completedDate = checkbox.checked ? localDateString() : null;
-        task.completedMinutes = checkbox.checked
-          ? getTodayAllocation(task)
-          : 0;
       }
       if (checkbox.checked && state.taskTimer.taskId === task.id) {
         state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false };
@@ -580,48 +565,56 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     const meta = document.createElement('div');
     meta.className = 'task-meta';
     if (task.mode === 'auto') {
-      meta.textContent = `오늘 ${formatDuration(getTodayAllocation(task))} 배정 · 총 남은 ${formatDuration(task.minutes)} · 마감 ${task.deadline}`;
+      meta.textContent = `오늘 ${formatDuration(getTodayAllocation(task))} 배정 · 총 ${formatDuration(task.minutes)} · 마감 ${task.deadline}`;
     } else {
       meta.textContent = `하루 ${formatDuration(task.minutes)} · 마감 ${task.deadline}`;
     }
     info.append(name, meta);
     main.append(checkbox, info);
 
-    if (!isTaskDoneToday(task)) {
-      const active = state.taskTimer.taskId === task.id;
-      const timerButton = document.createElement('button');
-      timerButton.type = 'button';
-      timerButton.className = `task-timer-btn${active ? ' active' : ''}`;
+   if (!isTaskDoneToday(task) && !showDelete) {
+  const active = state.taskTimer.taskId === task.id;
 
-      if (active && getTimerRemainingMs() <= 0) {
-        timerButton.textContent = '시간 종료';
-        timerButton.disabled = true;
-      } else if (active && state.taskTimer.startedAt !== null) {
-        timerButton.textContent = '일시정지';
-        timerButton.addEventListener('click', pauseTaskTimer);
-      } else if (active) {
-        timerButton.textContent = '계속';
-        timerButton.addEventListener('click', () => startTaskTimer(task));
-      } else {
-        timerButton.textContent = '시작';
-        timerButton.addEventListener('click', () => startTaskTimer(task));
-      }
-      main.append(timerButton);
+  const timerActions = document.createElement('div');
+  timerActions.className = 'timer-actions';
 
-      if (active) {
-        const stopButton = document.createElement('button');
-        stopButton.type = 'button';
-        stopButton.className = 'btn';
-        stopButton.textContent = '종료';
-        stopButton.addEventListener('click', stopTaskTimer);
-        main.append(stopButton);
-      }
-    }
+  const timerButton = document.createElement('button');
+  timerButton.type = 'button';
+  timerButton.className = `task-timer-btn${active ? ' active' : ''}`;
+
+  if (active && getTimerRemainingMs() <= 0) {
+    timerButton.textContent = '시간 종료';
+    timerButton.disabled = true;
+  } else if (active && state.taskTimer.startedAt !== null) {
+    timerButton.textContent = '일시정지';
+    timerButton.addEventListener('click', pauseTaskTimer);
+  } else if (active) {
+    timerButton.textContent = '계속';
+    timerButton.addEventListener('click', () => startTaskTimer(task));
+  } else {
+    timerButton.textContent = '시작';
+    timerButton.addEventListener('click', () => startTaskTimer(task));
+  }
+
+  timerActions.append(timerButton);
+
+  if (active) {
+    const stopButton = document.createElement('button');
+    stopButton.type = 'button';
+    stopButton.className = 'btn';
+    stopButton.textContent = '종료';
+    stopButton.addEventListener('click', stopTaskTimer);
+
+    timerActions.append(stopButton);
+  }
+
+  card.append(timerActions);
+}
 
     if (showDelete) {
       const deleteButton = document.createElement('button');
       deleteButton.type = 'button';
-      deleteButton.className = 'btn';
+      deleteButton.className = 'btn delete-btn';
       deleteButton.textContent = '삭제';
       deleteButton.setAttribute('aria-label', `${task.name} 삭제`);
       deleteButton.addEventListener('click', () => {
@@ -897,8 +890,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
       createdDate: localDateString(),
       createdAt: Date.now(),
       completed: false,
-      completedDate: null,
-      completedMinutes: 0
+      completedDate: null
     };
     state.tasks.push(task);
     applyDefaultTaskOrder();
@@ -926,7 +918,6 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     const today = localDateString();
     if (state.lastKnownDate !== today) {
       if (state.taskTimer.taskId) state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false };
-      settleCompletedAutoTasks(today);
       state.tasks.forEach(task => {
         if (task.mode === 'daily' && task.completedDate !== today) task.completedDate = null;
       });
@@ -990,7 +981,6 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
 
   loadState();
   state.lastKnownDate = localDateString();
-  settleCompletedAutoTasks(state.lastKnownDate);
   state.tasks.forEach(task => {
     if (task.mode === 'daily' && task.completedDate !== state.lastKnownDate) task.completedDate = null;
   });
