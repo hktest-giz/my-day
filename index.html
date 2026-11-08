@@ -603,7 +603,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     if (showDelete) {
       const deleteButton = document.createElement('button');
       deleteButton.type = 'button';
-      deleteButton.className = 'btn';
+      deleteButton.className = 'btn delete-btn';
       deleteButton.textContent = '삭제';
       deleteButton.setAttribute('aria-label', `${task.name} 삭제`);
       deleteButton.addEventListener('click', () => {
