@@ -1,5 +1,7 @@
 /* MY DAY offline cache. Increment the version when app files change. */
-/*캐시와 앱 업데이트 즉, 파일을 저장하고 다시 불러오기*/
+/* 캐시와 앱 업데이트 즉, 파일을 저장하고 다시 불러오기 */
+/* manifest.json = 앱의 이름, 아이콘 화면 표시 방식 즉, 웹사이트를 화면에 추가했을 때 앱처럼 보이도록 정보 제공 */
+/* index.html = 실제 화면 구성과 기능 */
 const CACHE_NAME = 'my-day-pink-grape-v5';
 const APP_FILES = [
   './',
