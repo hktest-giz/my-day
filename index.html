@@ -38,6 +38,8 @@ button { cursor: pointer; }
 .hero-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
 .brand { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 0; }
 .brand img { display: block; width: 25px; height: 25px; border-radius: 7px; }
+.brand-main { white-space: nowrap; }
+.brand-sub { display: block; font-size: 8px; font-weight: 400; margin-left: 30px; }
 .hero h1 { font-size: 25px; line-height: 1.25; margin: 20px 0 5px; font-weight: 850; letter-spacing: -.04em; }
 .hero-subtitle { margin: 0; font-size: 12px; font-weight: 650; }
 .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 21px; }
@@ -151,7 +153,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     <header class="hero">
       <div class="hero-top">
         <span>MY PERSONAL PLANNER </span>
-        <span class="brand"><span aria-hidden="true" style="font-size:20px">🍇</span> MY DAY <span style="font-size:8px; font-weight:400; margin-left:30px">: 100 Hours</span></span>
+        <span class="brand"><span class="brand-main"><span aria-hidden="true" style="font-size:20px">🍇</span> MY DAY</span><span class="brand-sub">: 100 Hours</span></span>
       </div>
       <h1>나의 하루를 계획해요</h1>
       <p class="hero-subtitle">Practice makes perfect.</p>
