@@ -86,6 +86,9 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
 .task-card.is-done .task-name { text-decoration: line-through; opacity: .65; }
 .task-meta { margin-top: 3px; color: var(--sub); font-size: 11px; font-weight: 600; overflow-wrap: anywhere; }
 .task-actions { display: flex; align-items: center; gap: 4px; flex: none; }
+.task-timer-btn { border: 1px solid var(--pink); border-radius: 9px; padding: 8px 10px; background: #FFF5F8; color: var(--ink); font-size: 11px; font-weight: 800; white-space: nowrap; }
+.task-timer-btn.active { background: var(--pink); }
+.task-timer-btn:disabled { opacity: .55; cursor: default; }
 .empty { padding: 19px 8px; text-align: center; color: var(--sub); font-size: 12px; font-weight: 600; }
 .form-grid { display: grid; gap: 13px; }
 .field-label { display: block; margin-bottom: 5px; color: var(--ink); font-size: 12px; font-weight: 800; }
@@ -268,7 +271,8 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     wakeTime: '07:00',
     activeTab: 'plan',
     manualOrder: false,
-    lastKnownDate: ''
+    lastKnownDate: '',
+    taskTimer: { taskId: null, remainingMs: 0, startedAt: null, paused: false }
   };
 
   function localDateString(date = new Date()) {
@@ -295,6 +299,77 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
   function formatHeaderDuration(minutes) {
     const safe = Math.max(0, Math.round(minutes));
     return `${String(Math.floor(safe / 60)).padStart(2, '0')}시간 ${String(safe % 60).padStart(2, '0')}분`;
+  }
+
+  function getTimerRemainingMs() {
+    const timer = state.taskTimer;
+    if (!timer || !timer.taskId) return 0;
+    return timer.startedAt !== null
+      ? Math.max(0, timer.remainingMs - (Date.now() - timer.startedAt))
+      : Math.max(0, timer.remainingMs);
+  }
+
+  function formatTaskTimer(ms) {
+    const seconds = Math.max(0, Math.ceil(ms / 1000));
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
+  function startTaskTimer(task) {
+    if (!task || isTaskDoneToday(task)) return;
+    const timer = state.taskTimer;
+    if (timer.taskId === task.id) {
+      if (timer.remainingMs <= 0) return;
+      if (timer.startedAt === null) {
+        timer.startedAt = Date.now();
+        timer.paused = false;
+      }
+    } else {
+      state.taskTimer = {
+        taskId: task.id,
+        remainingMs: Math.max(1, Number(task.minutes) || 60) * 60000,
+        startedAt: Date.now(),
+        paused: false
+      };
+    }
+    saveState();
+    render();
+  }
+
+  function pauseTaskTimer() {
+    const timer = state.taskTimer;
+    if (!timer.taskId || timer.startedAt === null) return;
+    timer.remainingMs = getTimerRemainingMs();
+    timer.startedAt = null;
+    timer.paused = true;
+    saveState();
+    render();
+  }
+
+  function stopTaskTimer() {
+    state.taskTimer = { taskId: null, remainingMs: 0, startedAt: null, paused: false };
+    saveState();
+    render();
+  }
+
+  function renderHeaderTaskTimer() {
+    const timer = state.taskTimer;
+    if (!timer.taskId) return false;
+    if (!state.tasks.some(task => task.id === timer.taskId)) {
+      state.taskTimer = { taskId: null, remainingMs: 0, startedAt: null, paused: false };
+      return false;
+    }
+    const remaining = getTimerRemainingMs();
+    const expired = remaining <= 0 && timer.startedAt !== null;
+    if (expired) {
+      timer.remainingMs = 0;
+      timer.startedAt = null;
+      timer.paused = true;
+    }
+    $('metric-time').textContent = formatTaskTimer(remaining);
+    return expired;
   }
 
   function parseDuration(value) {
@@ -330,6 +405,16 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
       state.manualOrder = Boolean(saved.manualOrder);
       if (Number.isFinite(saved.sleepMinutes)) state.sleepMinutes = Math.max(10, Math.min(1440, saved.sleepMinutes));
       if (typeof saved.wakeTime === 'string' && /^\d{2}:\d{2}$/.test(saved.wakeTime)) state.wakeTime = saved.wakeTime;
+      if (saved.taskTimer && typeof saved.taskTimer.taskId === 'string' &&
+          state.tasks.some(task => task.id === saved.taskTimer.taskId)) {
+        state.taskTimer = {
+          taskId: saved.taskTimer.taskId,
+          remainingMs: Math.max(0, Number(saved.taskTimer.remainingMs) || 0),
+          startedAt: saved.taskTimer.startedAt === null ? null : Number(saved.taskTimer.startedAt),
+          paused: Boolean(saved.taskTimer.paused)
+        };
+        if (!Number.isFinite(state.taskTimer.startedAt)) state.taskTimer.startedAt = null;
+      }
     } catch (error) {
       console.warn('MY DAY 저장 데이터를 불러오지 못했습니다.', error);
     }
@@ -341,7 +426,8 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
         tasks: state.tasks,
         manualOrder: state.manualOrder,
         sleepMinutes: state.sleepMinutes,
-        wakeTime: state.wakeTime
+        wakeTime: state.wakeTime,
+        taskTimer: state.taskTimer.taskId ? state.taskTimer : null
       }));
     } catch (error) {
       console.warn('MY DAY 데이터를 저장하지 못했습니다.', error);
@@ -441,6 +527,9 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
         task.completed = checkbox.checked;
         task.completedDate = checkbox.checked ? localDateString() : null;
       }
+      if (checkbox.checked && state.taskTimer.taskId === task.id) {
+        state.taskTimer = { taskId: null, remainingMs: 0, startedAt: null, paused: false };
+      }
       saveState();
       render();
     });
@@ -460,6 +549,37 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     info.append(name, meta);
     main.append(checkbox, info);
 
+    if (!isTaskDoneToday(task)) {
+      const active = state.taskTimer.taskId === task.id;
+      const timerButton = document.createElement('button');
+      timerButton.type = 'button';
+      timerButton.className = `task-timer-btn${active ? ' active' : ''}`;
+
+      if (active && getTimerRemainingMs() <= 0) {
+        timerButton.textContent = '시간 종료';
+        timerButton.disabled = true;
+      } else if (active && state.taskTimer.startedAt !== null) {
+        timerButton.textContent = '일시정지';
+        timerButton.addEventListener('click', pauseTaskTimer);
+      } else if (active) {
+        timerButton.textContent = '계속';
+        timerButton.addEventListener('click', () => startTaskTimer(task));
+      } else {
+        timerButton.textContent = '시작';
+        timerButton.addEventListener('click', () => startTaskTimer(task));
+      }
+      main.append(timerButton);
+
+      if (active) {
+        const stopButton = document.createElement('button');
+        stopButton.type = 'button';
+        stopButton.className = 'btn';
+        stopButton.textContent = '종료';
+        stopButton.addEventListener('click', stopTaskTimer);
+        main.append(stopButton);
+      }
+    }
+
     if (showDelete) {
       const deleteButton = document.createElement('button');
       deleteButton.type = 'button';
@@ -468,6 +588,9 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
       deleteButton.setAttribute('aria-label', `${task.name} 삭제`);
       deleteButton.addEventListener('click', () => {
         state.tasks = state.tasks.filter(item => item.id !== task.id);
+        if (state.taskTimer.taskId === task.id) {
+          state.taskTimer = { taskId: null, remainingMs: 0, startedAt: null, paused: false };
+        }
         saveState();
         render();
       });
@@ -656,6 +779,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
 
     $('metric-count').textContent = `${todayTasks.length}개`;
     $('metric-time').textContent = formatHeaderDuration(totalMinutes);
+    renderHeaderTaskTimer();
     $('metric-urgent').textContent = `긴급 ${urgentCount}개`;
     $('progress-value').textContent = `${progress}%`;
     $('progress-fill').style.width = `${progress}%`;
@@ -774,6 +898,14 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
   }
 
   function scheduleCalendarRefresh() {
+    window.setInterval(() => {
+      if (state.taskTimer.taskId && state.taskTimer.startedAt !== null) {
+        if (renderHeaderTaskTimer()) {
+          saveState();
+          render();
+        }
+      }
+    }, 250);
     window.setInterval(handleCalendarChange, 10000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) handleCalendarChange(); });
     window.addEventListener('focus', handleCalendarChange);
