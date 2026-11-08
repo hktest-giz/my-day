@@ -68,7 +68,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
 .btn:focus-visible, .tab:focus-visible, input:focus-visible { outline: 2px solid #C77D95; outline-offset: 2px; }
 .new-plan { margin-top: 12px; }
 .task-list { display: grid; gap: 9px; margin-top: 12px; }
-.task-card { display: flex; flex-direction: column; gap: 9px; min-width: 0; padding: 11px; border: 1px solid var(--line); border-radius: 12px; background: white; }
+.task-card { position: relative; display: flex; flex-direction: column; gap: 9px; min-width: 0; padding: 11px; border: 1px solid var(--line); border-radius: 12px; background: white; }
 .task-card[draggable="true"] { cursor: grab; touch-action: auto; user-select: none; -webkit-user-select: none; }
 .task-card.dragging { opacity: .48; border: 1px dashed #D994AA; background: #FFF5F7; }
 .task-card.drag-over { border-color: #D994AA; }
@@ -86,7 +86,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
 .task-card.is-done .task-name { text-decoration: line-through; opacity: .65; }
 .task-meta { margin-top: 3px; color: var(--sub); font-size: 11px; font-weight: 600; overflow-wrap: anywhere; }
 .task-actions { display: flex; align-items: center; gap: 4px; flex: none; }
-.task-timer-btn { border: 1px solid var(--pink); border-radius: 9px; padding: 8px 10px; background: #FFF5F8; color: var(--ink); font-size: 11px; font-weight: 800; white-space: nowrap; }
+.task-timer-btn { position: absolute; top: 14px; right: 14px; border: 1px solid var(--pink); border-radius: 9px; padding: 8px 10px; background: #FFF5F8; color: var(--ink); font-size: 11px; font-weight: 800; white-space: nowrap; }
 .task-timer-btn.active { background: var(--pink); }
 .task-timer-btn:disabled { opacity: .55; cursor: default; }
 .empty { padding: 19px 8px; text-align: center; color: var(--sub); font-size: 12px; font-weight: 600; }
