@@ -549,9 +549,10 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
   }
 
   function taskSortRank(task) {
-    if (isUrgentTask(task)) return 0;
-    if (task.mode === 'daily') return 1;
-    return 2;
+  if (isUrgentTask(task) && task.mode !== 'daily') return 0;
+  if (isUrgentTask(task) && task.mode === 'daily') return 1;
+  if (task.mode === 'daily') return 2;
+  return 3;
   }
 
   function applyDefaultTaskOrder() {
