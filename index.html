@@ -495,9 +495,16 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
       return;
     }
     const today = localDateString();
-    // 오늘 체크한 자동 배분만 되돌릴 수 있다. 날짜가 지나 확정된 차감은 복구하지 않는다.
-    if (task.completedDate === today && task.lastDeductedDate === today) {
-      task.minutes += Math.max(0, Number(task.lastDeductedMinutes) || 0);
+    const remainingMinutes = Math.max(0, Number(task.minutes) || 0);
+    const deductedMinutes = Math.max(0, Number(task.lastDeductedMinutes) || 0);
+
+    // 오늘 완료한 할 일은 당일 차감을 되돌린다.
+    // 남은 시간이 0분이 되어 완료 상태가 유지된 할 일은 날짜가 지나도
+    // 사용자가 직접 체크를 해제하면 마지막 차감 시간을 복구한다.
+    const canRestoreToday = task.completedDate === today && task.lastDeductedDate === today;
+    const canRestoreZeroTimeTask = remainingMinutes === 0 && deductedMinutes > 0;
+    if (deductedMinutes > 0 && (canRestoreToday || canRestoreZeroTimeTask)) {
+      task.minutes = remainingMinutes + deductedMinutes;
       task.lastDeductedDate = null;
       task.lastDeductedMinutes = 0;
     }
@@ -597,9 +604,8 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     checkbox.className = 'task-check';
     checkbox.checked = isTaskDoneToday(task);
     checkbox.setAttribute('aria-label', `${task.name} 완료`);
-    if (task.mode === 'auto' && Math.max(0, Number(task.minutes) || 0) === 0) {
-      checkbox.disabled = true;
-    }
+    // 남은 시간이 0분이어도 체크박스는 비활성화하지 않는다.
+    // 사용자가 직접 체크를 해제하면 undoTaskCompletion()에서 마지막 차감 시간을 복구한다.
     checkbox.addEventListener('change', () => {
       if (checkbox.checked) completeTask(task);
       else undoTaskCompletion(task);
@@ -988,7 +994,10 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
         task.allocationDate = null;
         task.todayAllocationMinutes = null;
       }
-      if (task.lastDeductedDate && task.lastDeductedDate !== today) {
+      // 남은 시간이 0분인 완료 항목은 직접 체크 해제할 때 마지막 차감 시간을
+      // 복구해야 하므로 기록을 유지한다. 남은 시간이 있는 항목의 지난 날짜 기록은 확정한다.
+      if (task.lastDeductedDate && task.lastDeductedDate !== today &&
+          Math.max(0, Number(task.minutes) || 0) > 0) {
         task.lastDeductedDate = null;
         task.lastDeductedMinutes = 0;
       }
