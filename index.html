@@ -426,7 +426,9 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
             };
           });
       }
-      state.manualOrder = Boolean(saved.manualOrder);
+      // 정렬 규칙을 업데이트한 첫 실행에서는 이전 버전의 수동 정렬값을 초기화한다.
+      // 이후 사용자가 직접 순서를 바꾸면 그 수동 순서는 계속 저장된다.
+      state.manualOrder = saved.sortOrderVersion === 2 ? Boolean(saved.manualOrder) : false;
       if (Number.isFinite(saved.sleepMinutes)) state.sleepMinutes = Math.max(10, Math.min(1440, saved.sleepMinutes));
       if (typeof saved.wakeTime === 'string' && /^\d{2}:\d{2}$/.test(saved.wakeTime)) state.wakeTime = saved.wakeTime;
       if (saved.taskTimer && typeof saved.taskTimer.taskId === 'string' &&
@@ -453,6 +455,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         tasks: state.tasks,
         manualOrder: state.manualOrder,
+        sortOrderVersion: 2,
         sleepMinutes: state.sleepMinutes,
         wakeTime: state.wakeTime,
         taskTimer: state.taskTimer.taskId ? state.taskTimer : null
