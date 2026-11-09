@@ -556,10 +556,13 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
   }
 
   function applyDefaultTaskOrder() {
-    if (state.manualOrder) return;
-    state.tasks.sort((a, b) => taskSortRank(a) - taskSortRank(b) ||
-      (taskSortRank(a) === 0 ? daysUntilDeadline(a) - daysUntilDeadline(b) : 0) ||
-      a.createdAt - b.createdAt);
+  if (state.manualOrder) return;
+
+  state.tasks.sort((a, b) =>
+    daysUntilDeadline(a) - daysUntilDeadline(b) ||
+    taskSortRank(a) - taskSortRank(b) ||
+    a.createdAt - b.createdAt
+  );
   }
 
   function getTodaysTasks() {
