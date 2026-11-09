@@ -84,14 +84,17 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
 .task-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .task-check { width: 17px; height: 17px; flex: none; margin: 0; accent-color: #DF879E; }
 .task-info { flex: 1; min-width: 0; }
+.task-card.has-top-action .task-info { padding-right: 88px; }
 .task-name { overflow-wrap: anywhere; font-size: 14px; font-weight: 500; }
 .task-card.is-done .task-name { text-decoration: line-through; opacity: .65; }
 .task-meta { margin-top: 3px; color: var(--sub); font-size: 11px; font-weight: 600; overflow-wrap: anywhere; }
 .task-actions { display: flex; align-items: center; gap: 4px; flex: none; }
 .task-timer-btn { border: 1px solid var(--pink); border-radius: 9px; padding: 8px 10px; background: #FFF5F8; color: var(--ink); font-size: 11px; font-weight: 800; white-space: nowrap; }
 .task-timer-btn.active { background: var(--pink); }
-.timer-actions { position: absolute; top: 4px; right: 14px; display: flex; flex-direction: row; align-items: center; gap: 6px; width: max-content; flex-wrap: nowrap; }.task-timer-btn:disabled { opacity: .55; cursor: default; }
+.timer-actions { position: absolute; top: 33.333%; right: 14px; transform: translateY(-50%); z-index: 2; display: flex; flex-direction: row; align-items: center; gap: 6px; width: max-content; flex-wrap: nowrap; }
 .timer-actions button { padding: 2px 3px; font-size: 9px; min-width: 40px; height: 28px; }
+.delete-btn { flex: 0 0 auto; width: 40px; min-width: 40px; height: 28px; padding: 2px 3px; font-size: 10px; }
+.task-timer-btn:disabled { opacity: .55; cursor: default; }
 .empty { padding: 19px 8px; text-align: center; color: var(--sub); font-size: 12px; font-weight: 600; }
 .form-grid { display: grid; gap: 13px; }
 .field-label { display: block; margin-bottom: 5px; color: var(--ink); font-size: 12px; font-weight: 800; }
@@ -126,7 +129,9 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
   .sleep-middle .text-input { font-size: 9px; }
   .step-btn { width: 26px; }
 }
-    
+
+
+
 @media (max-width: 600px) and (hover: none) and (pointer: coarse) {
   #task-deadline-input,
   #wake-time-input {
@@ -135,16 +140,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     box-sizing: border-box;
   }
 }
-    
-.delete-btn {
-  flex: 0 0 auto;
-  width: 40px;
-  min-width: 40px;
-  height: 30px;
-  padding: 2px 3px;
-  font-size: 10px;
-}
-    
+
   </style>
   <title>MY DAY · Pink Grape</title>
 </head>
@@ -152,7 +148,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
   <main class="app-shell">
     <header class="hero">
       <div class="hero-top">
-        <span>MY PERSONAL PLANNER </span>
+        <span>MY PERSONAL PLANNER</span>
         <span class="brand"><span class="brand-main"><span aria-hidden="true" style="font-size:20px">🍇</span> MY DAY</span><span class="brand-sub">: 100 Hours</span></span>
       </div>
       <h1>나의 하루를 계획해요</h1>
@@ -285,7 +281,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     activeTab: 'plan',
     manualOrder: false,
     lastKnownDate: '',
-    taskTimer: { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false }
+    taskTimer: { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false, date: null }
   };
 
   function localDateString(date = new Date()) {
@@ -345,7 +341,8 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
         remainingMs: durationMs,
         totalMs: durationMs,
         startedAt: Date.now(),
-        paused: false
+        paused: false,
+        date: localDateString()
       };
     }
     saveState();
@@ -363,7 +360,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
   }
 
   function stopTaskTimer() {
-    state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false };
+    state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false, date: null };
     saveState();
     render();
   }
@@ -372,15 +369,8 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     const timer = state.taskTimer;
     if (!timer.taskId || timer.startedAt === null || getTimerRemainingMs() > 0) return false;
     const task = state.tasks.find(item => item.id === timer.taskId);
-    if (task && !isTaskDoneToday(task)) {
-      if (task.mode === 'daily') {
-        task.completedDate = localDateString();
-      } else {
-        task.completed = true;
-        task.completedDate = localDateString();
-      }
-    }
-    state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false };
+    if (task && !isTaskDoneToday(task)) completeTask(task);
+    state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false, date: null };
     saveState();
     return true;
   }
@@ -412,17 +402,29 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
       if (Array.isArray(saved.tasks)) {
         state.tasks = saved.tasks
           .filter(task => task && typeof task.name === 'string' && typeof task.deadline === 'string')
-          .map((task, index) => ({
-            id: String(task.id || `${Date.now()}-${index}`),
-            name: task.name,
-            deadline: task.deadline,
-            minutes: Math.max(10, Number(task.minutes) || 60),
-            mode: task.mode === 'daily' ? 'daily' : 'auto',
-            createdDate: task.createdDate || localDateString(),
-            createdAt: Number.isFinite(Number(task.createdAt)) ? Number(task.createdAt) : index,
-            completed: Boolean(task.completed),
-            completedDate: task.completedDate || null
-          }));
+          .map((task, index) => {
+            const mode = task.mode === 'daily' ? 'daily' : 'auto';
+            const savedMinutes = Number(task.minutes);
+            return {
+              id: String(task.id || `${Date.now()}-${index}`),
+              name: task.name,
+              deadline: task.deadline,
+              minutes: Number.isFinite(savedMinutes)
+                ? Math.max(mode === 'daily' ? 10 : 0, savedMinutes)
+                : 60,
+              mode,
+              createdDate: task.createdDate || localDateString(),
+              createdAt: Number.isFinite(Number(task.createdAt)) ? Number(task.createdAt) : index,
+              completed: Boolean(task.completed),
+              completedDate: task.completedDate || null,
+              allocationDate: typeof task.allocationDate === 'string' ? task.allocationDate : null,
+              todayAllocationMinutes: Number.isFinite(Number(task.todayAllocationMinutes))
+                ? Math.max(0, Number(task.todayAllocationMinutes)) : null,
+              lastDeductedDate: typeof task.lastDeductedDate === 'string' ? task.lastDeductedDate : null,
+              lastDeductedMinutes: Number.isFinite(Number(task.lastDeductedMinutes))
+                ? Math.max(0, Number(task.lastDeductedMinutes)) : 0
+            };
+          });
       }
       state.manualOrder = Boolean(saved.manualOrder);
       if (Number.isFinite(saved.sleepMinutes)) state.sleepMinutes = Math.max(10, Math.min(1440, saved.sleepMinutes));
@@ -434,7 +436,10 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
           remainingMs: Math.max(0, Number(saved.taskTimer.remainingMs) || 0),
           totalMs: Math.max(0, Number(saved.taskTimer.totalMs) || Number(saved.taskTimer.remainingMs) || 0),
           startedAt: saved.taskTimer.startedAt === null ? null : Number(saved.taskTimer.startedAt),
-          paused: Boolean(saved.taskTimer.paused)
+          paused: Boolean(saved.taskTimer.paused),
+          date: typeof saved.taskTimer.date === 'string'
+            ? saved.taskTimer.date
+            : (saved.taskTimer.startedAt ? localDateString(new Date(Number(saved.taskTimer.startedAt))) : null)
         };
         if (!Number.isFinite(state.taskTimer.startedAt)) state.taskTimer.startedAt = null;
       }
@@ -459,7 +464,45 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
 
   function isTaskDoneToday(task) {
     if (task.mode === 'daily') return task.completedDate === localDateString();
-    return task.completed;
+    // 자동 배분의 남은 시간이 0이면 날짜가 바뀌어도 완료 상태를 유지한다.
+    if (Math.max(0, Number(task.minutes) || 0) === 0) return true;
+    return Boolean(task.completed) && task.completedDate === localDateString();
+  }
+
+  function completeTask(task) {
+    if (!task) return;
+    const today = localDateString();
+    if (task.mode === 'daily') {
+      task.completedDate = today;
+      return;
+    }
+    if (isTaskDoneToday(task)) return;
+
+    const allocation = getTodayAllocation(task);
+    if (allocation > 0) {
+      task.minutes = Math.max(0, task.minutes - allocation);
+      task.lastDeductedDate = today;
+      task.lastDeductedMinutes = allocation;
+    }
+    task.completed = true;
+    task.completedDate = today;
+  }
+
+  function undoTaskCompletion(task) {
+    if (!task) return;
+    if (task.mode === 'daily') {
+      task.completedDate = null;
+      return;
+    }
+    const today = localDateString();
+    // 오늘 체크한 자동 배분만 되돌릴 수 있다. 날짜가 지나 확정된 차감은 복구하지 않는다.
+    if (task.completedDate === today && task.lastDeductedDate === today) {
+      task.minutes += Math.max(0, Number(task.lastDeductedMinutes) || 0);
+      task.lastDeductedDate = null;
+      task.lastDeductedMinutes = 0;
+    }
+    task.completed = false;
+    task.completedDate = null;
   }
 
   function daysUntilDeadline(task) {
@@ -473,15 +516,26 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
 
   function getTodayAllocation(task) {
     if (task.mode === 'daily') return task.minutes;
+    const today = localDateString();
+    // 오늘 배정 시간은 하루 동안 고정한다. 체크 완료 후 남은 시간에서 차감돼도
+    // 오늘의 배정량과 타이머 시간은 바뀌지 않는다.
+    if (task.allocationDate === today && Number.isFinite(task.todayAllocationMinutes)) {
+      return Math.max(0, task.todayAllocationMinutes);
+    }
+    const remainingMinutes = Math.max(0, Number(task.minutes) || 0);
+    if (remainingMinutes === 0) return 0;
     const daysRemaining = Math.max(1, daysUntilDeadline(task) + 1);
-    return Math.ceil(task.minutes / daysRemaining / 10) * 10;
+    const allocation = Math.min(remainingMinutes, Math.ceil(remainingMinutes / daysRemaining / 10) * 10);
+    task.allocationDate = today;
+    task.todayAllocationMinutes = allocation;
+    return allocation;
   }
 
   function isInTodayPlan(task) {
     if (task.deadline < localDateString()) return false;
     if (task.mode === 'daily') return true;
-    if (task.completed && task.completedDate !== localDateString()) return false;
-    return getTodayAllocation(task) > 0;
+    if (task.completed && task.completedDate === localDateString()) return true;
+    return task.minutes > 0 && getTodayAllocation(task) > 0;
   }
 
   function taskSortRank(task) {
@@ -543,15 +597,14 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     checkbox.className = 'task-check';
     checkbox.checked = isTaskDoneToday(task);
     checkbox.setAttribute('aria-label', `${task.name} 완료`);
+    if (task.mode === 'auto' && Math.max(0, Number(task.minutes) || 0) === 0) {
+      checkbox.disabled = true;
+    }
     checkbox.addEventListener('change', () => {
-      if (task.mode === 'daily') {
-        task.completedDate = checkbox.checked ? localDateString() : null;
-      } else {
-        task.completed = checkbox.checked;
-        task.completedDate = checkbox.checked ? localDateString() : null;
-      }
+      if (checkbox.checked) completeTask(task);
+      else undoTaskCompletion(task);
       if (checkbox.checked && state.taskTimer.taskId === task.id) {
-        state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false };
+        state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false, date: null };
       }
       saveState();
       render();
@@ -565,53 +618,53 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     const meta = document.createElement('div');
     meta.className = 'task-meta';
     if (task.mode === 'auto') {
-      meta.textContent = `오늘 ${formatDuration(getTodayAllocation(task))} 배정 · 총 ${formatDuration(task.minutes)} · 마감 ${task.deadline}`;
+      meta.textContent = `오늘 ${formatDuration(getTodayAllocation(task))} 배정 · 남은 ${formatDuration(task.minutes)} · 마감 ${task.deadline}`;
     } else {
       meta.textContent = `하루 ${formatDuration(task.minutes)} · 마감 ${task.deadline}`;
     }
     info.append(name, meta);
     main.append(checkbox, info);
 
-   if (!isTaskDoneToday(task) && !showDelete) {
-  const active = state.taskTimer.taskId === task.id;
+    if (!isTaskDoneToday(task) && !showDelete) {
+      card.classList.add('has-top-action');
+      const active = state.taskTimer.taskId === task.id;
+      const timerActions = document.createElement('div');
+      timerActions.className = 'timer-actions';
 
-  const timerActions = document.createElement('div');
-  timerActions.className = 'timer-actions';
+      const timerButton = document.createElement('button');
+      timerButton.type = 'button';
+      timerButton.className = `task-timer-btn${active ? ' active' : ''}`;
 
-  const timerButton = document.createElement('button');
-  timerButton.type = 'button';
-  timerButton.className = `task-timer-btn${active ? ' active' : ''}`;
+      if (active && getTimerRemainingMs() <= 0) {
+        timerButton.textContent = '시간 종료';
+        timerButton.disabled = true;
+      } else if (active && state.taskTimer.startedAt !== null) {
+        timerButton.textContent = '일시정지';
+        timerButton.addEventListener('click', pauseTaskTimer);
+      } else if (active) {
+        timerButton.textContent = '계속';
+        timerButton.addEventListener('click', () => startTaskTimer(task));
+      } else {
+        timerButton.textContent = '시작';
+        timerButton.addEventListener('click', () => startTaskTimer(task));
+      }
+      timerActions.append(timerButton);
 
-  if (active && getTimerRemainingMs() <= 0) {
-    timerButton.textContent = '시간 종료';
-    timerButton.disabled = true;
-  } else if (active && state.taskTimer.startedAt !== null) {
-    timerButton.textContent = '일시정지';
-    timerButton.addEventListener('click', pauseTaskTimer);
-  } else if (active) {
-    timerButton.textContent = '계속';
-    timerButton.addEventListener('click', () => startTaskTimer(task));
-  } else {
-    timerButton.textContent = '시작';
-    timerButton.addEventListener('click', () => startTaskTimer(task));
-  }
-
-  timerActions.append(timerButton);
-
-  if (active) {
-    const stopButton = document.createElement('button');
-    stopButton.type = 'button';
-    stopButton.className = 'btn';
-    stopButton.textContent = '종료';
-    stopButton.addEventListener('click', stopTaskTimer);
-
-    timerActions.append(stopButton);
-  }
-
-  card.append(timerActions);
-}
+      if (active) {
+        const stopButton = document.createElement('button');
+        stopButton.type = 'button';
+        stopButton.className = 'btn';
+        stopButton.textContent = '종료';
+        stopButton.addEventListener('click', stopTaskTimer);
+        timerActions.append(stopButton);
+      }
+      card.append(timerActions);
+    }
 
     if (showDelete) {
+      card.classList.add('has-top-action');
+      const deleteActions = document.createElement('div');
+      deleteActions.className = 'timer-actions';
       const deleteButton = document.createElement('button');
       deleteButton.type = 'button';
       deleteButton.className = 'btn delete-btn';
@@ -620,12 +673,13 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
       deleteButton.addEventListener('click', () => {
         state.tasks = state.tasks.filter(item => item.id !== task.id);
         if (state.taskTimer.taskId === task.id) {
-          state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false };
+          state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false, date: null };
         }
         saveState();
         render();
       });
-      main.append(deleteButton);
+      deleteActions.append(deleteButton);
+      card.append(deleteActions);
     }
     card.append(main);
     return card;
@@ -827,15 +881,15 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
 
   function changeTaskDuration(delta) {
     const entered = parseDuration($('task-duration-input').value);
-    if (entered !== null && entered >= 10 && entered <= 5999) state.taskEntryMinutes = entered;
-    state.taskEntryMinutes = Math.max(10, Math.min(5999, state.taskEntryMinutes + delta));
+    if (entered !== null && entered >= 10 && entered <= 6000) state.taskEntryMinutes = entered;
+    state.taskEntryMinutes = Math.max(10, Math.min(6000, state.taskEntryMinutes + delta));
     $('task-duration-input').value = formatDuration(state.taskEntryMinutes);
     $('task-form-message').textContent = '';
   }
 
   function normalizeTaskDuration() {
     const parsed = parseDuration($('task-duration-input').value);
-    if (parsed === null || parsed < 10 || parsed > 5999) return false;
+    if (parsed === null || parsed < 10 || parsed > 6000) return false;
     state.taskEntryMinutes = parsed;
     $('task-duration-input').value = formatDuration(parsed);
     return true;
@@ -873,7 +927,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
       message.textContent = '할 일 이름과 마감 날짜를 입력해 줘.';
       return;
     }
-    if (duration === null || duration < 10 || duration > 5999) {
+    if (duration === null || duration < 10 || duration > 6000) {
       message.textContent = '예: 1시간 30분 또는 90분으로 입력해 줘.';
       return;
     }
@@ -914,13 +968,38 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     $('sleep-save-message').textContent = '수면 목표가 저장됐어.';
   }
 
+  function resetTaskStateForDate(today) {
+    state.tasks.forEach(task => {
+      if (task.mode === 'daily') {
+        if (task.completedDate !== today) task.completedDate = null;
+        return;
+      }
+
+      // 자동 배분은 체크할 때 이미 오늘 배정 시간을 task.minutes에서 차감했다.
+      // 날짜가 바뀔 때는 다시 차감하지 않고 체크와 일일 배정 스냅샷만 갱신한다.
+      if (Math.max(0, Number(task.minutes) || 0) > 0 && task.completedDate !== today) {
+        task.completed = false;
+        task.completedDate = null;
+      } else if (Math.max(0, Number(task.minutes) || 0) === 0) {
+        task.completed = true;
+      }
+
+      if (task.allocationDate !== today) {
+        task.allocationDate = null;
+        task.todayAllocationMinutes = null;
+      }
+      if (task.lastDeductedDate && task.lastDeductedDate !== today) {
+        task.lastDeductedDate = null;
+        task.lastDeductedMinutes = 0;
+      }
+    });
+  }
+
   function handleCalendarChange() {
     const today = localDateString();
     if (state.lastKnownDate !== today) {
-      if (state.taskTimer.taskId) state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false };
-      state.tasks.forEach(task => {
-        if (task.mode === 'daily' && task.completedDate !== today) task.completedDate = null;
-      });
+      if (state.taskTimer.taskId) state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false, date: null };
+      resetTaskStateForDate(today);
       state.lastKnownDate = today;
       applyDefaultTaskOrder();
       saveState();
@@ -981,9 +1060,10 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
 
   loadState();
   state.lastKnownDate = localDateString();
-  state.tasks.forEach(task => {
-    if (task.mode === 'daily' && task.completedDate !== state.lastKnownDate) task.completedDate = null;
-  });
+  if (state.taskTimer.taskId && state.taskTimer.date !== state.lastKnownDate) {
+    state.taskTimer = { taskId: null, remainingMs: 0, totalMs: 0, startedAt: null, paused: false, date: null };
+  }
+  resetTaskStateForDate(state.lastKnownDate);
   $('task-deadline-input').min = localDateString();
   $('task-deadline-input').value = localDateString();
   $('task-duration-input').value = formatDuration(state.taskEntryMinutes);
