@@ -39,7 +39,7 @@ button { cursor: pointer; }
 .brand { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 0; }
 .brand img { display: block; width: 25px; height: 25px; border-radius: 7px; }
 .brand-main { white-space: nowrap; }
-.brand-sub { display: block; font-size: 8px; font-weight: 400; margin-left: 26px; }
+.brand-sub { display: block; font-size: 8px; font-weight: 400; margin-left: 28px; }
 .hero h1 { font-size: 25px; line-height: 1.25; margin: 20px 0 5px; font-weight: 850; letter-spacing: -.04em; }
 .hero-subtitle { margin: 0; font-size: 12px; font-weight: 650; }
 .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 21px; }
@@ -1097,212 +1097,307 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   });
 }
 </script>
-<!-- MY DAY 캐릭터 추가 코드 시작 -->
+<!-- MY DAY 딸기와 곰돌이 애니메이션 추가 코드 시작 -->
 <style>
-/* 별도 공간을 늘리지 않고 기존 할 일 카드 안에서 움직입니다. */
-.myday-character-stage {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 0;
-  width: 100%;
-  height: 46px;
-  overflow: hidden;
-  pointer-events: none;
-}
-.task-card.myday-character-host .task-main,
-.task-card.myday-character-host .task-indicators {
+/* 이 코드는 원본 앱의 끝에 추가되는 캐릭터 표시 기능입니다. */
+/* 원본 요소의 크기와 배치는 바꾸지 않고, 글자와 버튼을 캐릭터보다 앞에 둡니다. */
+#today-task-list .task-card .task-main,
+#today-task-list .task-card .task-indicators {
   position: relative;
   z-index: 1;
 }
-.myday-character-frame {
+#today-task-list .myday-transfer {
   position: absolute;
-  top: 3px;
-  left: 0;
+  top: 33.333%;
+  right: 106px;
+  z-index: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border: 1px dashed #D9A1B2;
-  border-radius: 8px;
-  background: #FFF5F8;
-  color: #B8758B;
-  font-size: 9px;
-  font-weight: 700;
-  white-space: nowrap;
-  opacity: .75;
+  gap: 1px;
+  width: 66px;
+  height: 28px;
+  transform: translateY(-50%) scale(var(--myday-transfer-scale, 1));
+  transform-origin: right center;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#today-task-list .myday-transfer.entering {
+  animation: myday-transfer-in 260ms ease-out both;
+}
+#today-task-list .myday-transfer.leaving {
+  animation: myday-transfer-out 300ms ease-in both;
+}
+.myday-transfer .myday-transfer-strawberry,
+.myday-transfer .myday-transfer-bear {
+  display: block;
+  flex: none;
+  width: 21px;
+  height: 25px;
+  object-fit: contain;
+}
+.myday-transfer .myday-transfer-bear {
+  width: 23px;
+  height: 28px;
+}
+.myday-transfer .myday-transfer-track {
+  position: relative;
+  flex: 1 1 auto;
+  height: 8px;
+  min-width: 0;
+  background: radial-gradient(circle, #edc4d0 1px, transparent 1.4px) center / 6px 6px repeat-x;
+}
+.myday-transfer .myday-transfer-dot {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #c46f8a;
+  box-shadow: 0 0 3px rgba(196, 111, 138, .3);
   will-change: transform;
 }
-.myday-character-frame.has-image {
-  border: 0;
-  background: transparent;
+@keyframes myday-transfer-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
-.myday-character-frame img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+@keyframes myday-transfer-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #today-task-list .myday-transfer.entering,
+  #today-task-list .myday-transfer.leaving { animation: none; }
 }
 </style>
 <script>
 (() => {
   'use strict';
 
-  // HTML과 같은 폴더에 있는 2번 캐릭터 이미지입니다.
-  const CHARACTER_IMAGE_URL = './myday-character.png';
+  // 원본 앱의 상태나 타이머는 수정하지 않습니다. 오늘 목록의 버튼 상태를 확인해
+  // 시작한 할 일 카드에만 딸기-점-곰돌이를 그립니다.
   const list = document.getElementById('today-task-list');
   if (!list) return;
 
-  const actors = new Map();
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const actors = new Map();
   let animationId = 0;
+  let resizeObserver = null;
 
-  function createActor(taskId, running) {
+  function createActor(id) {
     const stage = document.createElement('div');
-    stage.className = 'myday-character-stage';
+    stage.className = 'myday-transfer entering';
     stage.setAttribute('aria-hidden', 'true');
 
-    const frame = document.createElement('div');
-    frame.className = 'myday-character-frame';
-    if (CHARACTER_IMAGE_URL) {
-      frame.classList.add('has-image');
-      const image = document.createElement('img');
-      image.src = CHARACTER_IMAGE_URL;
-      image.alt = '';
-      frame.append(image);
-    } else {
-      frame.textContent = '캐릭터';
-    }
-    stage.append(frame);
+    const strawberry = document.createElement('img');
+    strawberry.className = 'myday-transfer-strawberry';
+    strawberry.src = './myday-strawberry.png';
+    strawberry.alt = '';
+    strawberry.draggable = false;
+
+    const track = document.createElement('span');
+    track.className = 'myday-transfer-track';
+    const dot = document.createElement('span');
+    dot.className = 'myday-transfer-dot';
+    track.append(dot);
+
+    const bear = document.createElement('img');
+    bear.className = 'myday-transfer-bear';
+    bear.src = './myday-character.png';
+    bear.alt = '';
+    bear.draggable = false;
+    stage.append(strawberry, track, bear);
 
     const actor = {
-      taskId, stage, frame,
-      x: running ? -40 : 0,
-      direction: 1,
-      phase: running ? 'enter' : 'walk',
-      running,
-      lastTime: null
+      id, stage, track, dot,
+      card: null,
+      running: false,
+      leaving: false,
+      phase: 0,
+      lastTime: null,
+      exitTimer: null,
+      top: '',
+      right: ''
     };
-    frame.style.transform = `translateX(${actor.x}px)`;
-    actors.set(taskId, actor);
+    actors.set(id, actor);
+    window.setTimeout(() => stage.classList.remove('entering'), 280);
     return actor;
   }
 
   function attach(actor, card) {
-    if (actor.stage.parentElement === card) return;
-    const previousCard = actor.stage.parentElement;
-    if (previousCard) previousCard.classList.remove('myday-character-host');
-    card.classList.add('myday-character-host');
+    if (actor.card === card && actor.stage.parentElement === card) return;
+    if (resizeObserver && actor.card) resizeObserver.unobserve(actor.card);
+    actor.card = card;
     card.append(actor.stage);
+    if (resizeObserver) resizeObserver.observe(card);
+    if (actor.top) actor.stage.style.top = actor.top;
+    if (actor.right) actor.stage.style.right = actor.right;
+  }
+
+  function positionByButton(actor, button) {
+    if (!actor.card || !button) return;
+    const cardBox = actor.card.getBoundingClientRect();
+    const buttonBox = button.getBoundingClientRect();
+    // 비활성 탭은 좌표가 0이므로 이전 좌표를 보존합니다.
+    if (!cardBox.width || !buttonBox.width) return;
+    actor.top = `${buttonBox.top - cardBox.top + buttonBox.height / 2}px`;
+    actor.right = `${cardBox.right - buttonBox.left + 4}px`;
+    actor.stage.style.top = actor.top;
+    actor.stage.style.right = actor.right;
+
+    // 같은 높이에 글자가 있는 경우, 박스를 늘리거나 글씨를 숨기는 대신
+    // 딸기·곰돌이 전체 크기만 가능한 범위에서 줄입니다.
+    const rowTop = buttonBox.top + buttonBox.height / 2 - 14;
+    const rowBottom = rowTop + 28;
+    let occupiedRight = cardBox.left + 8;
+    const consider = rect => {
+      if (rect.width && rect.bottom > rowTop && rect.top < rowBottom) {
+        occupiedRight = Math.max(occupiedRight, rect.right);
+      }
+    };
+    for (const node of actor.card.querySelectorAll('.task-name, .task-meta, .indicator')) {
+      if (document.createRange) {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        for (const rect of range.getClientRects()) consider(rect);
+        range.detach?.();
+      } else {
+        // 범위 측정이 없는 브라우저에서는 글자의 영역 전체를 안전하게 피합니다.
+        consider(node.getBoundingClientRect());
+      }
+    }
+    const checkbox = actor.card.querySelector('.task-check');
+    if (checkbox) consider(checkbox.getBoundingClientRect());
+    const availableWidth = Math.max(0, buttonBox.left - 8 - occupiedRight);
+    // 공간이 부족하면 크기를 줄이고, 너무 좁으면 장식을 숨겨 글자를 가리지 않습니다.
+    // 박스·버튼·글씨의 크기와 위치는 변경하지 않습니다.
+    actor.stage.style.visibility = availableWidth < 26 ? 'hidden' : 'visible';
+    actor.stage.style.setProperty('--myday-transfer-scale', String(Math.min(1, availableWidth / 66)));
   }
 
   function removeActor(actor) {
-    const card = actor.stage.parentElement;
-    if (card) card.classList.remove('myday-character-host');
+    if (actor.exitTimer !== null) window.clearTimeout(actor.exitTimer);
+    if (resizeObserver && actor.card) resizeObserver.unobserve(actor.card);
     actor.stage.remove();
-    actors.delete(actor.taskId);
+    actors.delete(actor.id);
+  }
+
+  function exitActor(actor) {
+    if (actor.leaving) return;
+    actor.leaving = true;
+    actor.running = false;
+    actor.lastTime = null;
+    actor.stage.classList.remove('entering');
+    actor.stage.classList.add('leaving');
+    if (reducedMotion.matches) {
+      removeActor(actor);
+    } else {
+      actor.exitTimer = window.setTimeout(() => {
+        if (actor.leaving) removeActor(actor);
+      }, 320);
+    }
+  }
+
+  function drawDot(actor) {
+    const available = Math.max(0, actor.track.clientWidth - 4);
+    // 0→1→0 왕복. 시간의 경과량을 표시하거나 채우는 막대가 아닙니다.
+    const fraction = actor.phase <= 1 ? actor.phase : 2 - actor.phase;
+    actor.dot.style.transform = `translateX(${available * fraction}px)`;
+  }
+
+  function animate(now) {
+    animationId = 0;
+    let stillMoving = false;
+    for (const actor of actors.values()) {
+      if (!actor.running || actor.leaving) continue;
+      if (!reducedMotion.matches) {
+        const elapsed = actor.lastTime === null ? 0 : Math.min((now - actor.lastTime) / 1000, 0.05);
+        actor.phase = (actor.phase + elapsed / 1.2) % 2;
+        actor.lastTime = now;
+        drawDot(actor);
+        stillMoving = true;
+      } else {
+        actor.lastTime = null;
+        drawDot(actor);
+      }
+    }
+    if (stillMoving) animationId = requestAnimationFrame(animate);
   }
 
   function syncCharacters() {
     const cards = new Map();
     for (const card of list.children) {
-      if (card.matches('.task-card[data-task-id]')) {
-        cards.set(card.dataset.taskId, card);
-      }
+      if (card.matches('.task-card[data-task-id]')) cards.set(card.dataset.taskId, card);
     }
-
-    const activeButton = list.querySelector('.task-timer-btn.active');
-    const activeCard = activeButton?.closest('.task-card');
+    const button = list.querySelector('.task-timer-btn.active');
+    const activeCard = button?.closest('.task-card');
     const activeId = activeCard?.dataset.taskId || null;
-    const running = activeButton?.textContent.trim() === '일시정지';
+    const running = button?.textContent.trim() === '일시정지';
 
     for (const actor of actors.values()) {
-      const card = cards.get(actor.taskId);
+      const card = cards.get(actor.id);
       if (!card) {
         removeActor(actor);
         continue;
       }
       attach(actor, card);
-      if (actor.taskId === activeId) {
-        if (actor.phase === 'exit') actor.phase = 'walk';
-        if (actor.running !== running) actor.lastTime = null;
-        actor.running = running;
-      } else if (actor.phase !== 'exit') {
-        actor.phase = 'exit';
-        actor.lastTime = null;
+      if (actor.id !== activeId) {
+        exitActor(actor);
+        continue;
       }
+      if (actor.exitTimer !== null) window.clearTimeout(actor.exitTimer);
+      actor.exitTimer = null;
+      actor.leaving = false;
+      actor.stage.classList.remove('leaving');
+      if (actor.running !== running) actor.lastTime = null;
+      actor.running = running;
+      positionByButton(actor, button);
+      drawDot(actor);
     }
 
     if (activeId && !actors.has(activeId)) {
-      attach(createActor(activeId, running), activeCard);
+      const actor = createActor(activeId);
+      actor.running = running;
+      attach(actor, activeCard);
+      positionByButton(actor, button);
+      drawDot(actor);
     }
-    if (actors.size && !animationId) {
+    if (!animationId && [...actors.values()].some(actor => actor.running && !actor.leaving)) {
       animationId = requestAnimationFrame(animate);
     }
   }
 
-  function animate(now) {
-    animationId = 0;
-    for (const actor of actors.values()) {
-      const seconds = actor.lastTime === null
-        ? 0
-        : Math.min((now - actor.lastTime) / 1000, 0.05);
-      actor.lastTime = now;
-
-      // 다른 탭에 있어 보이지 않는 퇴장은 바로 정리합니다.
-      if (!actor.stage.getClientRects().length) {
-        if (actor.phase === 'exit') removeActor(actor);
-        continue;
-      }
-
-      const width = actor.stage.clientWidth;
-      const maxX = Math.max(0, width - actor.frame.offsetWidth);
-
-      if (reducedMotion.matches) {
-        if (actor.phase === 'exit') {
-          removeActor(actor);
-          continue;
-        }
-        actor.x = 0;
-        actor.phase = 'walk';
-      } else if (actor.phase === 'exit') {
-        actor.x += Math.max(180, width * 2) * seconds;
-        if (actor.x >= width) {
-          removeActor(actor);
-          continue;
-        }
-      } else if (actor.running) {
-        if (actor.phase === 'enter') {
-          actor.x += 80 * seconds;
-          if (actor.x >= 0) {
-            actor.x = 0;
-            actor.phase = 'walk';
-          }
-        } else {
-          actor.x = Math.max(0, Math.min(maxX, actor.x + actor.direction * 35 * seconds));
-          if (actor.x >= maxX) actor.direction = -1;
-          if (actor.x <= 0) actor.direction = 1;
-        }
-      }
-      actor.frame.style.transform = `translateX(${actor.x}px)`;
-    }
-    if (!reducedMotion.matches && [...actors.values()].some(actor =>
-      actor.phase === 'exit' || actor.running
-    )) {
-      animationId = requestAnimationFrame(animate);
+  function reposition() {
+    const button = list.querySelector('.task-timer-btn.active');
+    const id = button?.closest('.task-card')?.dataset.taskId;
+    const actor = actors.get(id);
+    if (actor) {
+      positionByButton(actor, button);
+      drawDot(actor);
     }
   }
 
-  // 원본이 목록을 다시 그려도 같은 할 일의 캐릭터를 새 카드로 옮깁니다.
+  if ('ResizeObserver' in window) resizeObserver = new ResizeObserver(reposition);
   new MutationObserver(syncCharacters).observe(list, { childList: true });
+  window.addEventListener('resize', reposition);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) requestAnimationFrame(reposition);
+  });
+  // 탭을 바꾸어 '오늘 계획'을 다시 열었을 때도 버튼 위치에 맞춥니다.
+  document.querySelectorAll('[data-tab]').forEach(tab => {
+    tab.addEventListener('click', () => requestAnimationFrame(reposition));
+  });
   reducedMotion.addEventListener?.('change', () => {
-    if (actors.size && !animationId) animationId = requestAnimationFrame(animate);
+    for (const actor of actors.values()) actor.lastTime = null;
+    if (!animationId && [...actors.values()].some(actor => actor.running && !actor.leaving)) {
+      animationId = requestAnimationFrame(animate);
+    }
   });
   syncCharacters();
 })();
 </script>
-<!-- MY DAY 캐릭터 추가 코드 끝 -->
+<!-- MY DAY 딸기와 곰돌이 애니메이션 추가 코드 끝 -->
 </body>
 </html>
