@@ -959,8 +959,41 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
       completed: false,
       completedDate: null
     };
+    
+    if (state.manualOrder) {
+      const getRank = (item) => {
+        if (isUrgentTask(item) && item.mode !== 'daily') return 0;
+        if (isUrgentTask(item) && item.mode === 'daily') return 1;
+        if (item.mode === 'daily') return 2;
+        return 3;
+    };
+
+    const newDays = daysUntilDeadline(task);
+    const newRank = getRank(task);
+
+    const insertIndex = state.tasks.findIndex(item => {
+    const existingDays = daysUntilDeadline(item);
+    const existingRank = getRank(item);
+
+    return (
+      existingDays > newDays ||
+      (existingDays === newDays && existingRank > newRank)
+    );
+    });
+
+    if (insertIndex === -1) {
+    state.tasks.push(task);
+    } else {
+    state.tasks.splice(insertIndex, 0, task);
+    }
+    } else {
     state.tasks.push(task);
     applyDefaultTaskOrder();
+    }
+    
+    
+    
+    
     saveState();
     $('task-name-input').value = '';
     state.taskEntryMinutes = 60;
