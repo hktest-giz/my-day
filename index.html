@@ -407,6 +407,10 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
             const savedMinutes = Number(task.minutes);
             return {
               id: String(task.id || `${Date.now()}-${index}`),
+              manualOrderPosition:
+                Number.isInteger(task.manualOrderPosition) && task.manualOrderPosition >= 0
+                  ? task.manualOrderPosition
+                  : null,
               name: task.name,
               deadline: task.deadline,
               minutes: Number.isFinite(savedMinutes)
@@ -426,9 +430,8 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
             };
           });
       }
-      // 정렬 규칙을 업데이트한 첫 실행에서는 이전 버전의 수동 정렬값을 초기화한다.
-      // 이후 사용자가 직접 순서를 바꾸면 그 수동 순서는 계속 저장된다.
-      state.manualOrder = saved.sortOrderVersion === 2 ? Boolean(saved.manualOrder) : false;
+      // 카드별 수동 위치를 사용하므로 전체 수동 정렬 상태는 사용하지 않는다.
+      state.manualOrder = false;
       if (Number.isFinite(saved.sleepMinutes)) state.sleepMinutes = Math.max(10, Math.min(1440, saved.sleepMinutes));
       if (typeof saved.wakeTime === 'string' && /^\d{2}:\d{2}$/.test(saved.wakeTime)) state.wakeTime = saved.wakeTime;
       if (saved.taskTimer && typeof saved.taskTimer.taskId === 'string' &&
@@ -454,8 +457,8 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         tasks: state.tasks,
-        manualOrder: state.manualOrder,
-        sortOrderVersion: 2,
+        manualOrder: false,
+        sortOrderVersion: 3,
         sleepMinutes: state.sleepMinutes,
         wakeTime: state.wakeTime,
         taskTimer: state.taskTimer.taskId ? state.taskTimer : null
@@ -549,20 +552,63 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
   }
 
   function taskSortRank(task) {
-  if (isUrgentTask(task) && task.mode !== 'daily') return 0;
-  if (isUrgentTask(task) && task.mode === 'daily') return 1;
-  if (task.mode === 'daily') return 2;
-  return 3;
+    if (isUrgentTask(task) && task.mode !== 'daily') return 0;
+    if (isUrgentTask(task) && task.mode === 'daily') return 1;
+    if (task.mode === 'daily') return 2;
+    return 3;
   }
 
   function applyDefaultTaskOrder() {
-  if (state.manualOrder) return;
+    const compareTasks = (a, b) =>
+      daysUntilDeadline(a) - daysUntilDeadline(b) ||
+      taskSortRank(a) - taskSortRank(b) ||
+      a.createdAt - b.createdAt;
 
-  state.tasks.sort((a, b) =>
-    daysUntilDeadline(a) - daysUntilDeadline(b) ||
-    taskSortRank(a) - taskSortRank(b) ||
-    a.createdAt - b.createdAt
-  );
+    const ordered = new Array(state.tasks.length);
+
+    // 직접 이동한 카드만 기존 위치에 고정
+    const pinnedTasks = state.tasks
+      .filter(task => Number.isInteger(task.manualOrderPosition))
+      .sort((a, b) =>
+        a.manualOrderPosition - b.manualOrderPosition
+      );
+
+    pinnedTasks.forEach(task => {
+      let index = Math.min(task.manualOrderPosition, ordered.length - 1);
+
+      while (index < ordered.length && ordered[index]) {
+        index++;
+      }
+
+      if (index >= ordered.length) {
+        index = ordered.length - 1;
+
+        while (index >= 0 && ordered[index]) {
+          index--;
+        }
+      }
+
+      if (index >= 0) {
+        ordered[index] = task;
+      }
+    });
+
+    // 직접 이동하지 않은 카드는 기본 정렬 적용
+    const normalTasks = state.tasks
+      .filter(task => !Number.isInteger(task.manualOrderPosition))
+      .sort(compareTasks);
+
+    let nextIndex = 0;
+
+    normalTasks.forEach(task => {
+      while (ordered[nextIndex]) {
+        nextIndex++;
+      }
+
+      ordered[nextIndex] = task;
+    });
+
+    state.tasks = ordered.filter(Boolean);
   }
 
   function getTodaysTasks() {
@@ -698,15 +744,37 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     return card;
   }
 
-  function reorderTasksFromRegistry() {
+  function reorderTasksFromRegistry(movedTaskId) {
     const registry = $('registered-task-list');
-    const ids = [...registry.querySelectorAll('.task-card[data-task-id]')].map(card => card.dataset.taskId);
+
+    const ids = [
+      ...registry.querySelectorAll('.task-card[data-task-id]')
+    ].map(card => card.dataset.taskId);
+
     if (ids.length !== state.tasks.length) return;
+
     const byId = new Map(state.tasks.map(task => [task.id, task]));
     const reordered = ids.map(id => byId.get(id)).filter(Boolean);
+
     if (reordered.length !== state.tasks.length) return;
+
+    // 기존에 직접 이동했던 카드들의 고정 정보 유지
+    const previouslyPinned = new Set(
+      state.tasks
+        .filter(task => Number.isInteger(task.manualOrderPosition))
+        .map(task => task.id)
+    );
+
     state.tasks = reordered;
-    state.manualOrder = true;
+
+    // 이번에 이동한 카드와 기존 고정 카드만 위치 저장
+    state.tasks.forEach((task, index) => {
+      if (task.id === movedTaskId || previouslyPinned.has(task.id)) {
+        task.manualOrderPosition = index;
+      }
+    });
+
+    applyDefaultTaskOrder();
     saveState();
     render();
   }
@@ -740,8 +808,11 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
     registry.addEventListener('drop', event => {
       if (!mouseDraggedId) return;
       event.preventDefault();
+
+      const movedTaskId = mouseDraggedId;
       mouseDraggedId = null;
-      reorderTasksFromRegistry();
+
+      reorderTasksFromRegistry(movedTaskId);
     });
     registry.addEventListener('dragend', () => {
       mouseDraggedId = null;
@@ -789,11 +860,18 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
 
     const finishTouchDrag = () => {
       if (!touchDrag) return;
+
       clearTimeout(touchDrag.timer);
+
       const didMove = touchDrag.active;
+      const movedTaskId = touchDrag.card.dataset.taskId;
+
       touchDrag.card.classList.remove('dragging');
       touchDrag = null;
-      if (didMove) reorderTasksFromRegistry();
+
+      if (didMove) {
+        reorderTasksFromRegistry(movedTaskId);
+      }
     };
     registry.addEventListener('touchend', finishTouchDrag);
     registry.addEventListener('touchcancel', finishTouchDrag);
@@ -959,41 +1037,10 @@ h3 { margin: 0; font-size: 14px; font-weight: 800; }
       completed: false,
       completedDate: null
     };
-    
-    if (state.manualOrder) {
-      const getRank = (item) => {
-        if (isUrgentTask(item) && item.mode !== 'daily') return 0;
-        if (isUrgentTask(item) && item.mode === 'daily') return 1;
-        if (item.mode === 'daily') return 2;
-        return 3;
-    };
 
-    const newDays = daysUntilDeadline(task);
-    const newRank = getRank(task);
-
-    const insertIndex = state.tasks.findIndex(item => {
-    const existingDays = daysUntilDeadline(item);
-    const existingRank = getRank(item);
-
-    return (
-      existingDays > newDays ||
-      (existingDays === newDays && existingRank > newRank)
-    );
-    });
-
-    if (insertIndex === -1) {
-    state.tasks.push(task);
-    } else {
-    state.tasks.splice(insertIndex, 0, task);
-    }
-    } else {
     state.tasks.push(task);
     applyDefaultTaskOrder();
-    }
-    
-    
-    
-    
+
     saveState();
     $('task-name-input').value = '';
     state.taskEntryMinutes = 60;
